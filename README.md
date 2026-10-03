@@ -142,7 +142,7 @@ Pick flows and rows, save suites, see each step as it runs, open per-test report
 ## Quick start
 
 ```bat
-git clone https://github.com/YOUR-USERNAME/understudy.git
+git clone https://github.com/daiyanHasin/understudy.git
 cd understudy
 ```
 

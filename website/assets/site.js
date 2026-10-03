@@ -1,7 +1,7 @@
 /* Understudy website - Copyright (c) 2026 Hasin Md. Daiyan. All rights reserved. */
 
 /* ===== Edit these two lines after you publish ===== */
-var GITHUB_URL   = "https://github.com/YOUR-USERNAME/understudy";
+var GITHUB_URL   = "https://github.com/daiyanHasin/understudy";
 var DOWNLOAD_URL = GITHUB_URL + "/archive/refs/heads/main.zip";
 /* ================================================= */
 
