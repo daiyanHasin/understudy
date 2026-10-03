@@ -15,7 +15,7 @@
 [![100% local](https://img.shields.io/badge/runs-100%25%20locally-d98a1c)](#security-and-privacy)
 [![License](https://img.shields.io/badge/license-proprietary-555b66)](LICENSE)
 
-**[Website & docs](https://YOUR-SITE.vercel.app)** · **[Quick start](#quick-start)** · **[Recording](#recording-a-flow)** · **[Changelog](CHANGELOG.md)**
+**[Website & docs](https://understudy-chi.vercel.app/)** · **[Quick start](#quick-start)** · **[Recording](#recording-a-flow)** · **[Changelog](CHANGELOG.md)**
 
 <br>
 
