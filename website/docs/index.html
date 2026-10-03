@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Documentation · Understudy</title>
+<meta name="description" content="Install, record, data-drive and run Maestro mobile tests with Understudy. Complete documentation.">
+<meta name="theme-color" content="#0b0c0f">
+<meta property="og:title" content="Understudy documentation">
+<meta property="og:image" content="/assets/img/og.png">
+<link rel="icon" href="/assets/logo.svg" type="image/svg+xml">
+<link rel="preload" href="/assets/fonts/inter-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/site.css">
+<script>try{var t=localStorage.getItem("us-site-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="nav">
+  <div class="wrap wide">
+    <button class="icon-btn dtoggle" id="docsMenu" type="button" aria-label="Documentation menu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <a class="brand" href="/"><img src="/assets/logo.svg" alt="" width="28" height="28">Understudy <span class="tagdocs">docs</span></a>
+    <nav class="nav-links" aria-label="Main">
+      <a href="/">Home</a>
+      <a href="/docs" aria-current="page">Docs</a>
+      <a data-gh="/blob/main/CHANGELOG.md" href="#">Changelog</a>
+    </nav>
+    <div class="nav-right">
+      <button class="icon-btn" id="themeBtn" type="button" aria-label="Switch theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></svg></button>
+      <a class="btn ghost" data-gh href="#">GitHub</a>
+    </div>
+  </div>
+</header>
+
+<div class="docs">
+  <aside class="dside" aria-label="Documentation">
+    <input class="dsearch" id="docSearch" type="search" placeholder="Search the docs" aria-label="Search the docs">
+    <div class="group"><b>GET STARTED</b>
+      <a href="#introduction">Introduction</a>
+      <a href="#requirements">Requirements</a>
+      <a href="#install">Install</a>
+      <a href="#first-run">First run</a>
+    </div>
+    <div class="group"><b>RECORD</b>
+      <a href="#devices">Devices</a>
+      <a href="#apks">APKs and apps</a>
+      <a href="#recording">Recording a flow</a>
+      <a href="#modes">Recording modes</a>
+      <a href="#steps">Editing steps</a>
+      <a href="#blocks">Conditions and loops</a>
+      <a href="#flow-editor">Flow editor</a>
+    </div>
+    <div class="group"><b>TEST DATA</b>
+      <a href="#data-driven">Data-driven values</a>
+      <a href="#excel">Excel format</a>
+      <a href="#excel-editor">Excel editor</a>
+    </div>
+    <div class="group"><b>RUN</b>
+      <a href="#running">Running flows</a>
+      <a href="#rows">Choosing rows</a>
+      <a href="#results">Results and reports</a>
+      <a href="#dashboard">Dashboard</a>
+    </div>
+    <div class="group"><b>REFERENCE</b>
+      <a href="#configuration">Configuration</a>
+      <a href="#security">Security and privacy</a>
+      <a href="#structure">Project structure</a>
+      <a href="#limitations">Limitations</a>
+      <a href="#troubleshooting">Troubleshooting</a>
+      <a href="#faq">FAQ</a>
+    </div>
+  </aside>
+
+  <main class="dmain" id="main">
+    <section id="introduction">
+      <h1>Understudy documentation</h1>
+      <p class="lede">Understudy records Android UI tests on a virtual device or a real phone, turns typed values into Excel test data, and runs everything with the Maestro CLI — all on your own PC.</p>
+      <figure class="shot"><img src="/assets/img/record.webp" alt="Understudy Record tab" width="2000" height="1250"></figure>
+      <p>Understudy is a local web app with a desktop feel. A small Node.js server runs on <code>127.0.0.1</code>, talks to your device through adb, writes Maestro flows into <code>Flows/</code> and test data into <code>TestData/</code>, and runs the Maestro CLI for you. It opens in its own window and never needs an account or internet connection after setup.</p>
+      <div class="callout"><b>New in 1.1:</b> APK manager with a remove button, <em>From device</em> recording, placeholder targets, step types, conditions and loops, a two-way flow editor, a choice of Excel file and sheet, Wi-Fi phones, clean-state snapshots, much faster screen, and Android tools without Android Studio.</div>
+    </section>
+
+    <section id="requirements">
+      <h2>Requirements</h2>
+      <div class="tablewrap"><table class="t">
+        <thead><tr><th>YOU NEED</th><th>WHY</th><th>WHERE</th></tr></thead>
+        <tbody>
+          <tr><td>Windows 10 or 11</td><td>The launcher and process handling are Windows-based.</td><td>—</td></tr>
+          <tr><td>Virtualization enabled</td><td>The Android emulator needs it.</td><td>BIOS setting, plus <em>Windows Hypervisor Platform</em> in Windows Features</td></tr>
+          <tr><td>Node.js 18+</td><td>Runs Understudy.</td><td><a href="https://nodejs.org" rel="noopener">nodejs.org</a></td></tr>
+          <tr><td>Java 17+</td><td>Required by Maestro and the Android tools.</td><td><a href="https://adoptium.net" rel="noopener">adoptium.net</a></td></tr>
+          <tr><td>Maestro CLI</td><td>Runs the tests. Maestro Studio is not needed.</td><td><a href="https://docs.maestro.dev/getting-started/installing-maestro" rel="noopener">docs.maestro.dev</a></td></tr>
+          <tr><td>Android tools</td><td>adb, emulator and a virtual device.</td><td>Understudy → Setup → <strong>Install Android tools</strong></td></tr>
+        </tbody>
+      </table></div>
+      <p><strong>Memory:</strong> 8 GB works with the light virtual device; 16 GB is comfortable. A real phone over USB or Wi-Fi is the fastest option of all.</p>
+    </section>
+
+    <section id="install">
+      <h2>Install</h2>
+      <h3 id="install-get">1. Get the project</h3>
+      <p>Clone the repository, or download the ZIP from GitHub and unzip it anywhere you like.</p>
+      <div class="code"><div class="bar"><i></i><i></i><i></i>&nbsp; Command Prompt</div><pre>git clone https://github.com/YOUR-USERNAME/understudy.git
+cd understudy</pre></div>
+      <h3 id="install-start">2. Start Understudy</h3>
+      <p>Double-click <code>Understudy.vbs</code>. The first start installs its components (about a minute, needs internet) and offers to add a desktop shortcut. Understudy then opens in its own window at <code>http://understudy.localhost:4545</code>.</p>
+      <h3 id="install-maestro">3. Install the Maestro CLI</h3>
+      <p>Follow the official instructions, then check it in a <strong>new</strong> terminal:</p>
+      <div class="code"><div class="bar"><i></i><i></i><i></i>&nbsp; Command Prompt</div><pre>maestro --version
+java -version</pre></div>
+      <h3 id="install-android">4. Install the Android tools</h3>
+      <p>Open <strong>Setup</strong> and press <strong>Install Android tools</strong>. A PowerShell window downloads about 1.5 GB from Google's official server — command-line tools, platform-tools (adb), the emulator and one system image — and creates a light virtual device called <code>Understudy_Pixel</code> (2 GB RAM). You choose Android 13 (recommended), 14, or 12 (lightest).</p>
+      <div class="callout">Android Studio is <b>not</b> needed. If you already have the Android SDK, Understudy finds it through <code>ANDROID_HOME</code> or <code>%LOCALAPPDATA%\Android\Sdk</code>.</div>
+    </section>
+
+    <section id="first-run">
+      <h2>First run</h2>
+      <p>The <strong>Setup</strong> checklist checks Node.js, Java, the Maestro CLI, the Android SDK, adb, the emulator, hardware acceleration, virtual devices and connected devices. Every red item shows how to fix it.</p>
+      <figure class="shot"><img src="/assets/img/setup.webp" alt="Setup checklist" width="2000" height="1250" loading="lazy"></figure>
+      <p>To stop Understudy, press <strong>Quit</strong> at the bottom of the sidebar. If you just close the window, Understudy stops by itself a few minutes later when nothing is running. <code>start-gui.bat</code> starts it with a visible console for troubleshooting.</p>
+    </section>
+
+    <section id="devices">
+      <h2>Devices</h2>
+      <p>The device picker sits at the top of the <strong>Record</strong> tab, with a refresh button (<kbd>↻</kbd>) and <strong>Stop</strong> / <strong>Disconnect</strong>. <strong>Add device</strong> opens the rest.</p>
+      <figure class="shot"><img src="/assets/img/devices.webp" alt="Add device menu" width="2000" height="1250" loading="lazy"></figure>
+      <h3 id="dev-virtual">Virtual device</h3>
+      <p>Choose a virtual device and press <strong>Start</strong>. By default it runs inside Understudy only, using your GPU (<em>Graphics: fast</em>). If it closes while starting, a red box shows the emulator's error and the full log is saved to <code>logs/emulator-&lt;name&gt;.log</code>. Try <em>Graphics: compatible</em>, and check <em>Hardware acceleration</em> in Setup.</p>
+      <h3 id="dev-usb">Phone over USB</h3>
+      <p>Turn on <em>Developer options → USB debugging</em>, plug the phone in and accept the prompt. It appears in the device list. Unplug the cable to disconnect.</p>
+      <h3 id="dev-wifi">Phone over Wi-Fi</h3>
+      <p>On Android 11+, open <em>Developer options → Wireless debugging</em>. The first time, choose <em>Pair device with pairing code</em> and enter the pairing address and 6-digit code under <strong>First time? Pair with code</strong>. Then enter the IP address and port shown on the Wireless debugging screen and press <strong>Connect</strong>.</p>
+      <h3 id="dev-clean">Clean state</h3>
+      <p>For virtual devices: get the device how you want it (logged out, permissions granted, onboarding done), press <strong>Save clean state</strong>, and use <strong>Reset to clean state</strong> before recording or testing. Every session then starts from exactly the same point.</p>
+    </section>
+
+    <section id="apks">
+      <h2>APKs and apps</h2>
+      <p>The APK manager sits next to the app ID on the Record tab.</p>
+      <ul>
+        <li><strong>Add APK…</strong> copies an <code>.apk</code> into the local <code>Apps/</code> folder. It is checked before it is stored and never uploaded anywhere.</li>
+        <li><strong>Install</strong> installs the selected APK on the current device (with permissions granted) and fills in the app ID.</li>
+        <li><strong>×</strong> removes the selected APK from <code>Apps/</code>, so you can add a newer build.</li>
+      </ul>
+      <p>The app ID box also suggests every app already installed on the device. <strong>Launch app</strong> starts it, optionally with <strong>Fresh data</strong> (clears the app's storage first).</p>
+    </section>
+
+    <section id="recording">
+      <h2>Recording a flow</h2>
+      <ol>
+        <li>Choose or start a device.</li>
+        <li>Add and install your APK, or pick an installed app ID.</li>
+        <li>Name the flow, for example <code>Login/login_valid.yaml</code>, and add tags such as <code>smoke, login</code>.</li>
+        <li>Press <strong>Launch app</strong>. A <em>Launch app</em> step is added.</li>
+        <li>Click a field on the screen, type in the box under the device and press <kbd>Enter</kbd>. Choose <strong>Read from test data</strong> or <strong>Use this exact text</strong>.</li>
+        <li>Continue through the flow. Use <strong>Back</strong>, <strong>Enter</strong>, <strong>Hide keyboard</strong> and <strong>Scroll</strong> under the device, or <strong>Insert</strong> for more.</li>
+        <li><strong>Save flow</strong>, or <strong>Save and run</strong> to run it straight away.</li>
+      </ol>
+      <p>Press <kbd>Ctrl</kbd> + <kbd>Z</kbd> to remove the last step. The highlight on the screen shows exactly which element a step targets.</p>
+    </section>
+
+    <section id="modes">
+      <h2>Recording modes</h2>
+      <div class="tablewrap"><table class="t">
+        <thead><tr><th>MODE</th><th>WHAT IT DOES</th></tr></thead>
+        <tbody>
+          <tr><td>Record</td><td>Click, long-press (hold) and swipe (drag) on the screen inside Understudy. Each action is performed on the device and becomes a step.</td></tr>
+          <tr><td>From device</td><td>Use the phone, or the emulator's own window, directly. Only touches inside your app become steps; the keyboard, launcher and other apps are ignored. Typed text is read back from the screen and you choose how to use it.</td></tr>
+          <tr><td>Add check</td><td>Click anything to add <code>assertVisible</code> for it. Nothing is tapped.</td></tr>
+          <tr><td>Just use</td><td>Control the device without recording.</td></tr>
+        </tbody>
+      </table></div>
+      <div class="callout"><b>From device tips.</b> Enter the app ID first. Tap at a normal pace: a tap made right as the screen changes may be saved as a screen position and is marked so you can fix it. Password text can't be read back, so Understudy asks for it.</div>
+    </section>
+
+    <section id="steps">
+      <h2>Editing steps</h2>
+      <h3 id="steps-type">Change the type</h3>
+      <p>Each tap or check has a type menu: <em>Tap</em>, <em>Double tap</em>, <em>Long press</em>, <em>Check visible</em>, <em>Check not visible</em>, <em>Scroll until visible</em>, or <em>+ Type text after this</em>.</p>
+      <h3 id="steps-target">Change the target</h3>
+      <p>Understudy offers every way to find the element, best first:</p>
+      <ul>
+        <li><strong>ID</strong> — the developer's resource ID; the most stable choice.</li>
+        <li><strong>Placeholder</strong> — the hint inside an empty field, such as “Enter email”. Works for classic and Jetpack Compose fields.</li>
+        <li><strong>Text</strong> or <strong>Label</strong> — visible text or accessibility label.</li>
+        <li><strong>Screen position</strong> — a last resort that can break on other screen sizes.</li>
+      </ul>
+      <p>Targets that match more than one element are flagged. Choose <em>Edit target…</em> to type your own ID, text or position.</p>
+      <h3 id="steps-move">Move, delete, select</h3>
+      <p>Use ▲ ▼ to move a step and × to delete it. Tick steps to delete them together or wrap them in a block.</p>
+      <h3 id="steps-insert">Insert</h3>
+      <p><strong>Insert</strong> adds: wait for animations, hide keyboard, press Back, press Enter, scroll down, clear text, screenshot, and empty Repeat / If visible / Repeat while / Retry blocks.</p>
+    </section>
+
+    <section id="blocks">
+      <h2>Conditions and loops</h2>
+      <p>Tick the steps, then choose <strong>Repeat</strong>, <strong>If visible</strong>, <strong>While visible</strong> or <strong>Retry</strong> in the bar above the list. Blocks can be nested, edited (times, visible / not visible, target) and unwrapped.</p>
+      <div class="tablewrap"><table class="t">
+        <thead><tr><th>BLOCK</th><th>MAESTRO COMMAND</th><th>USE IT FOR</th></tr></thead>
+        <tbody>
+          <tr><td>Repeat</td><td><code>repeat: times</code></td><td>Doing something N times, e.g. adding 3 items.</td></tr>
+          <tr><td>Repeat while</td><td><code>repeat: while</code></td><td>Scrolling or dismissing until something appears or disappears.</td></tr>
+          <tr><td>If visible</td><td><code>runFlow: when</code></td><td>Popups that only sometimes appear, like permission prompts.</td></tr>
+          <tr><td>Retry</td><td><code>retry: maxRetries</code></td><td>Steps that are flaky because of network or timing.</td></tr>
+        </tbody>
+      </table></div>
+      <div class="code"><div class="bar"><i></i><i></i><i></i>&nbsp; YAML</div><pre><span class="k">- runFlow</span>:
+    <span class="k">when</span>:
+      <span class="k">visible</span>:
+        <span class="k">text</span>: <span class="s">"Allow"</span>
+    <span class="k">commands</span>:
+      - <span class="k">tapOn</span>: <span class="s">"Allow"</span>
+<span class="k">- repeat</span>:
+    <span class="k">times</span>: 3
+    <span class="k">commands</span>:
+      - <span class="k">scroll</span></pre></div>
+      <p>Looping over <em>data</em> is different: each Excel row is run as a separate test from the Run tab (see <a href="#rows">Choosing rows</a>).</p>
+    </section>
+
+    <section id="flow-editor">
+      <h2>Flow editor</h2>
+      <p>The <strong>Flow</strong> panel on the right shows the YAML Understudy will save — and you can edit it. When you change it, the panel highlights and an <strong>Apply changes</strong> button appears. Press it (or <kbd>Ctrl</kbd> + <kbd>Enter</kbd>) and the step list is rebuilt from your YAML.</p>
+      <ul>
+        <li>Any Maestro command Understudy doesn't know is kept as a <em>Custom step</em>, exactly as written.</li>
+        <li>The <code>runScript</code> line is managed for you and points at the chosen Excel sheet.</li>
+        <li>Paste an existing flow to continue recording it.</li>
+        <li>Saving with unapplied changes applies them first; YAML errors are shown with their line number.</li>
+      </ul>
+      <p>The <strong>Element</strong> tab shows the last tapped element: type, ID, text, placeholder, label and app.</p>
+    </section>
+
+    <section id="data-driven">
+      <h2>Data-driven values</h2>
+      <p>Every time you type a value while recording, Understudy asks how to use it.</p>
+      <figure class="shot"><img src="/assets/img/value-dialog.webp" alt="Value dialog" width="2000" height="1250" loading="lazy"></figure>
+      <ul>
+        <li><strong>Use this exact text</strong> — written into the flow as is.</li>
+        <li><strong>Read from test data</strong> — the flow gets <code>${output.Column}</code> and the value goes into Excel as row 1.</li>
+      </ul>
+      <h3 id="data-where">Choosing the file and sheet</h3>
+      <p>The first time, choose where data goes: an <strong>existing Excel file and sheet</strong>, an <strong>existing file with a new sheet</strong>, or a <strong>new file</strong> in <code>TestData/</code>. All data-driven values in one flow use one sheet; change it any time with <strong>Change</strong> under the steps.</p>
+      <h3 id="data-columns">Columns</h3>
+      <p>The column name is suggested from the field (<code>et_email</code> → <code>Email</code>, “Enter your password” → <code>Password</code>), and the sheet's existing columns are offered. New columns are added at the end. A value already in row 1 is never overwritten. Reusing a column name reuses its value.</p>
+      <p>Click a value chip in the step list at any time to switch between exact text and test data.</p>
+    </section>
+
+    <section id="excel">
+      <h2>Excel format</h2>
+      <p>Plain <code>.xlsx</code> files in <code>TestData/</code>. <strong>Row 1 holds the column names</strong>; every other row is one test case.</p>
+      <div class="tablewrap"><table class="t">
+        <thead><tr><th>EMAIL</th><th>PASSWORD</th><th>EXPECTED</th></tr></thead>
+        <tbody><tr><td>alice@example.com</td><td>Secret1</td><td>Home</td></tr><tr><td>bob@example.com</td><td>Secret2</td><td>Home</td></tr></tbody>
+      </table></div>
+      <p>A flow loads one row with a <code>runScript</code> line, relative to the flow file:</p>
+      <div class="code"><div class="bar"><i></i><i></i><i></i>&nbsp; Flows/Login/login_valid.yaml</div><pre>- <span class="k">runScript</span>: <span class="s">"../../Scripts/LoginData/Valid.js"</span>   <span class="c"># Scripts/&lt;file&gt;/&lt;sheet&gt;.js</span>
+- <span class="k">inputText</span>: <span class="s">"${output.Email}"</span></pre></div>
+      <ul>
+        <li>Use letters, numbers, <code>_</code> and <code>-</code> in file, sheet and column names. Column names are case-sensitive.</li>
+        <li>Empty cells become <code>""</code>; blank rows and columns are ignored.</li>
+        <li>Cells are read as Excel shows them, so leading zeros and dates are kept.</li>
+        <li>Keep workbook names unique across <code>TestData/</code> subfolders.</li>
+        <li>After editing Excel outside Understudy, press <strong>Prepare Data</strong> on the Run tab.</li>
+      </ul>
+    </section>
+
+    <section id="excel-editor">
+      <h2>Excel editor</h2>
+      <p>The <strong>Test data</strong> tab edits workbooks without leaving Understudy: edit cells, insert rows above/below and columns left/right, delete them, add sheets and create new files. A backup is written to <code>ExcelBackups/</code> before every save. Formula and date cells are read-only, and the first 1,000 rows of a sheet are shown.</p>
+      <figure class="shot"><img src="/assets/img/test-data.webp" alt="Excel editor" width="2000" height="1250" loading="lazy"></figure>
+    </section>
+
+    <section id="running">
+      <h2>Running flows</h2>
+      <figure class="shot"><img src="/assets/img/run.webp" alt="Run flows tab" width="2000" height="1250" loading="lazy"></figure>
+      <ol>
+        <li><strong>Prepare Data</strong> turns your Excel files into data scripts (it also runs automatically at start and after saving).</li>
+        <li>Tick flows, click a tag, or load a saved suite. Flows run in the order you tick them; reorder them in the queue.</li>
+        <li>Set <strong>Rows</strong> per flow, then <strong>Run Selected</strong> or <strong>Run All</strong>.</li>
+      </ol>
+      <p>Options: <strong>Stop</strong> at any time, <strong>Stop the queue if a flow fails</strong>, and <strong>Rerun failed</strong> (exact flow and row). <strong>Save queue as suite</strong> keeps the order, rows and options under a name.</p>
+    </section>
+
+    <section id="rows">
+      <h2>Choosing rows</h2>
+      <div class="tablewrap"><table class="t">
+        <thead><tr><th>YOU TYPE</th><th>RUNS</th></tr></thead>
+        <tbody>
+          <tr><td><em>(empty)</em></td><td>row 1</td></tr>
+          <tr><td><code>all</code></td><td>every data row</td></tr>
+          <tr><td><code>2,7,13</code></td><td>rows 2, 7 and 13</td></tr>
+          <tr><td><code>2-5</code></td><td>rows 2 to 5</td></tr>
+          <tr><td><code>1,4-6,10</code></td><td>mixed</td></tr>
+        </tbody>
+      </table></div>
+      <p>Each selected row is a separate test with its own report, shown as <em>flow · row N</em>. Selections are checked before the run starts. Sub-flows that load their own sheet always use row 1.</p>
+    </section>
+
+    <section id="results">
+      <h2>Results and reports</h2>
+      <p>While a run is going, the <strong>Live run</strong> panel shows every Maestro step as it happens (running, passed, failed, time per step, sub-flows indented) next to the Excel row in use, with progress and elapsed time. Afterwards the first failure opens automatically, with its failure screenshot and the failing step highlighted. Each test writes one Maestro HTML report to <code>Reports/</code>, viewable inside Understudy.</p>
+    </section>
+
+    <section id="dashboard">
+      <h2>Dashboard</h2>
+      <figure class="shot"><img src="/assets/img/dashboard.webp" alt="Dashboard" width="2000" height="1250" loading="lazy"></figure>
+      <p>Every run is saved to <code>History/</code> (last 300 runs). The dashboard shows runs recorded, tests executed, pass rate and average run time; passed vs failed per run; the pass-rate trend; most failures; slowest tests; and <strong>flaky tests</strong> — tests that both passed and failed with the same data recently. <strong>Compare two runs</strong> lists what got fixed, what newly fails, what still fails, time changes, and the failed step.</p>
+    </section>
+
+    <section id="configuration">
+      <h2>Configuration</h2>
+      <div class="tablewrap"><table class="t">
+        <thead><tr><th>WHAT</th><th>WHERE</th></tr></thead>
+        <tbody>
+          <tr><td>Name, tagline, author, version</td><td><code>app.config.json</code></td></tr>
+          <tr><td>Open in the default browser instead of an app window</td><td><code>"window": "browser"</code> in <code>app.config.json</code></td></tr>
+          <tr><td>Address and port</td><td><code>HOST_NAME</code> and <code>PORT</code> at the top of <code>web-gui.js</code></td></tr>
+          <tr><td>Android SDK location</td><td><code>ANDROID_HOME</code> environment variable</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="security">
+      <h2>Security and privacy</h2>
+      <ul>
+        <li>The server listens on <strong>127.0.0.1 only</strong>. There is no telemetry and nothing is uploaded.</li>
+        <li>A new <strong>session token</strong> is created at every start. The app window receives it as an HttpOnly, SameSite=Strict cookie and sends it as a header on every change; requests with an unknown <strong>Host</strong> or <strong>Origin</strong> are refused. Other websites in your browser can't control Understudy.</li>
+        <li>adb and the emulator are started <strong>without a shell</strong>, and every argument sent to the device is quoted, so typed text can never become a command.</li>
+        <li>Flow, workbook, sheet, column, APK and device names are validated. Request bodies and uploads are size-limited; APKs are checked before they are stored.</li>
+        <li>Maestro's HTML reports are shown in a <strong>sandbox</strong>.</li>
+      </ul>
+    </section>
+
+    <section id="structure">
+      <h2>Project structure</h2>
+      <div class="code"><div class="bar"><i></i><i></i><i></i>&nbsp; understudy/</div><pre>Understudy.vbs            <span class="c"># start, no console window</span>
+start-gui.bat             <span class="c"># start with a console (troubleshooting)</span>
+web-gui.js                <span class="c"># local server</span>
+index.html app.js styles.css
+ui/                       <span class="c"># recorder, setup, dashboard, run extras</span>
+lib/                      <span class="c"># android, capture, recorder, runner, prepare, excel, security</span>
+tools/install-android.ps1 <span class="c"># Android tools without Android Studio</span>
+Flows/                    <span class="c"># your Maestro flows</span>
+TestData/                 <span class="c"># your Excel test data</span>
+Apps/                     <span class="c"># your APKs (local only, not committed)</span>
+Reports/ History/ logs/   <span class="c"># created while you work</span></pre></div>
+    </section>
+
+    <section id="limitations">
+      <h2>Limitations</h2>
+      <ul>
+        <li>Windows only for now; Android only (iOS simulators need macOS).</li>
+        <li>The device screen is frames, not video — about 5–10 per second on a virtual device.</li>
+        <li>Some apps refuse emulators (banking, root or emulator detection, Play Integrity). Use a real phone.</li>
+        <li>One device and one test at a time. Each data row starts Maestro again.</li>
+        <li>Close workbooks in Excel before saving them from Understudy.</li>
+      </ul>
+    </section>
+
+    <section id="troubleshooting">
+      <h2>Troubleshooting</h2>
+      <div class="tablewrap"><table class="t">
+        <thead><tr><th>PROBLEM</th><th>FIX</th></tr></thead>
+        <tbody>
+          <tr><td>Nothing opens after <code>Understudy.vbs</code></td><td>Read <code>logs/understudy.log</code>, or run <code>start-gui.bat</code> to see the error.</td></tr>
+          <tr><td>Virtual device doesn't start</td><td>Read the red box on the Record tab. Try <em>Graphics: compatible</em>, check <em>Hardware acceleration</em> in Setup, and see <code>logs/emulator-&lt;name&gt;.log</code>.</td></tr>
+          <tr><td>“Could not read the screen layout”</td><td>Wait for animations to stop and tap again.</td></tr>
+          <tr><td>Non-English text won't type</td><td>Install the free ADB Keyboard app on the device (add its APK and press Install).</td></tr>
+          <tr><td>Values are empty when a flow runs</td><td>Press <strong>Prepare Data</strong>. Check the <code>runScript</code> path and that the column name matches exactly.</td></tr>
+          <tr><td>“Close it in Excel”</td><td>The workbook is open in Excel. Close it and save again.</td></tr>
+          <tr><td>“Understudy was restarted”</td><td>Press <strong>Reload</strong>.</td></tr>
+          <tr><td><code>understudy.localhost</code> doesn't open</td><td>Use <code>http://localhost:4545</code>.</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="faq">
+      <h2>FAQ</h2>
+      <h3 id="faq-studio">Do I need Maestro Studio or Android Studio?</h3>
+      <p>No. You need the free Maestro CLI. Understudy records flows itself and can install the Android tools.</p>
+      <h3 id="faq-apk">Is my APK uploaded?</h3>
+      <p>No. It's copied into <code>Apps/</code> on your PC and installed with adb.</p>
+      <h3 id="faq-existing">Can I use flows I already have?</h3>
+      <p>Yes. Put them in <code>Flows/</code>, or paste them into the recorder's Flow panel to edit them.</p>
+      <h3 id="faq-license">What's the license?</h3>
+      <p>Proprietary, free to use unmodified for personal or internal testing. Redistribution, resale or modified versions need written permission. Understudy is independent and not affiliated with mobile.dev.</p>
+      <div class="pager"><a href="/">← Back to home</a><a data-gh="/issues" href="#">Report an issue →</a></div>
+    </section>
+  </main>
+
+  <aside class="dtoc" aria-label="On this page"><b>ON THIS PAGE</b><div class="list"></div></aside>
+</div>
+
+<footer class="site">
+  <div class="wrap">
+    <div>© <span data-year>2026</span> Hasin Md. Daiyan · <a href="mailto:daiyanhasin07@gmail.com">daiyanhasin07@gmail.com</a></div>
+    <div class="links"><a href="/">Home</a><a data-gh href="#">GitHub</a><a data-gh="/blob/main/LICENSE" href="#">License</a></div>
+  </div>
+</footer>
+<script src="/assets/site.js" defer></script>
+</body>
+</html>

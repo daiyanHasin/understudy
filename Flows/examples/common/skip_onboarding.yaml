@@ -1,0 +1,6 @@
+# Sub-flow used by wikipedia_search.yaml. Safe to run on its own too.
+appId: org.wikipedia
+---
+- tapOn:
+    text: "Skip"
+    optional: true

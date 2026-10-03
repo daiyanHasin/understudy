@@ -1,0 +1,60 @@
+Understudy (formerly X-Maestro Flow Runner)
+Copyright (c) 2026 Hasin Md. Daiyan. All rights reserved.
+
+PROPRIETARY SOFTWARE LICENSE
+
+This software, including its source code, user interface, documentation and
+all associated files (the "Software"), is the property of Hasin Md. Daiyan
+(the "Author") and is protected by copyright law. The Software is NOT open
+source. Making the source code visible (for example on GitHub) does not place
+it in the public domain or grant any open-source license.
+
+1. PERMITTED USE
+   Subject to the terms below, you may, free of charge:
+   a) download and install the Software, and
+   b) use the unmodified Software to run and manage your own tests, for
+      personal use or for internal testing and evaluation within your
+      organisation.
+
+2. RESTRICTIONS
+   Without prior written permission from the Author, you may NOT:
+   a) copy, publish, distribute, sublicense, rent, lease, lend or sell the
+      Software or any part of it, modified or unmodified;
+   b) modify, adapt, translate or create derivative works of the Software for
+      distribution or for use by third parties;
+   c) offer the Software, or functionality substantially based on it, as a
+      product, a hosted service or part of a commercial offering;
+   d) remove or alter any copyright, author, credit or license notice.
+   Forking the repository through GitHub's own features is allowed only to the
+   extent GitHub's Terms of Service require; it grants no further rights.
+
+3. THIRD-PARTY COMPONENTS
+   Parts of the Software are derived from, or depend on, third-party software
+   licensed under its own terms (including the Apache License 2.0). Those
+   components remain under their original licenses, which take precedence for
+   those components. See THIRD_PARTY_NOTICES.md and the LICENSES folder.
+   Maestro itself is not included; it is installed separately by the user.
+
+4. YOUR DATA
+   Your flows, test data, reports and results remain yours. The Software runs
+   locally and does not send them to the Author.
+
+5. NO WARRANTY
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
+
+6. LIMITATION OF LIABILITY
+   IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+   FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR ITS USE.
+
+7. TERMINATION
+   This permission ends automatically if you break any of these terms. On
+   termination you must stop using and delete all copies of the Software.
+
+8. COMMERCIAL AND OTHER LICENSES
+   For commercial use, redistribution, partnership or any use not covered
+   above, contact the Author:
+
+   Hasin Md. Daiyan  <daiyanhasin07@gmail.com>

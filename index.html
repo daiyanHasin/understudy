@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<!-- Understudy - Copyright (c) 2026 Hasin Md. Daiyan. All rights reserved. See LICENSE. -->
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="us-token" content="__US_TOKEN__">
+<meta name="theme-color" content="#16181d">
+<title>Understudy</title>
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="toasts"></div>
+
+<aside class="side" aria-label="Main">
+  <div class="sbrand">
+    <img class="mark" src="assets/logo.svg" alt="" width="30" height="30">
+    <div class="logo" id="brandLogo" hidden></div>
+    <div class="sname"><h1 id="brandName">Understudy</h1><span id="brandTag" class="stag"></span></div>
+  </div>
+  <nav class="snav">
+    <button class="tab"        id="tabbtn-record" onclick="showTab('record')"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3" class="fill"/></svg><span>Record</span></button>
+    <button class="tab active" id="tabbtn-run"    onclick="showTab('run')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l11 7-11 7z"/></svg><span>Run flows</span></button>
+    <button class="tab"        id="tabbtn-data"   onclick="showTab('data')"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 10h16M10 10v9"/></svg><span>Test data</span></button>
+    <button class="tab"        id="tabbtn-editor" onclick="showTab('editor')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h7l4 4v12H7z"/><path d="M14 4v4h4M10 13l-2 2 2 2M14 13l2 2-2 2"/></svg><span>Flow files</span></button>
+    <button class="tab"        id="tabbtn-dashboard" onclick="showTab('dashboard')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V11M10 19V6M15 19v-5M20 19V9"/></svg><span>Dashboard</span></button>
+    <div class="ssep"></div>
+    <button class="tab"        id="tabbtn-setup"  onclick="showTab('setup')"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg><span>Setup</span></button>
+  </nav>
+  <div class="sfoot">
+    <div class="user" title="Accounts are coming in a later version">
+      <span class="avatar" aria-hidden="true">LU</span>
+      <div class="uinfo"><b>Local user</b><span>Sign-in coming soon</span></div>
+    </div>
+    <div class="srow">
+      <button class="btn mini" id="themeBtn" onclick="toggleTheme()" title="Toggle dark mode" aria-label="Toggle dark mode">&#9788;</button>
+      <button class="btn mini grow" onclick="quitApp()" title="Stop Understudy">Quit</button>
+    </div>
+  </div>
+</aside>
+<div class="mainwrap">
+<div class="pathbar"><span class="dim">Project</span> <span id="projpath">&hellip;</span></div>
+
+<main class="wrap">
+<section id="tab-record" hidden>
+  <div class="rectop">
+    <div class="devpick">
+      <span class="ldot" id="recDot" aria-hidden="true"></span>
+      <select id="recDevice" onchange="Rec.chooseDevice()" aria-label="Device"></select>
+      <button class="btn mini icon" onclick="Rec.refreshDevices()" title="Refresh devices" aria-label="Refresh devices">&#8635;</button>
+      <button class="btn mini" id="recDisconnect" onclick="Rec.disconnect()" disabled>Disconnect</button>
+      <details class="menu" id="devMenu">
+        <summary class="btn mini">Add device &#9662;</summary>
+        <div class="menupop">
+          <div class="mgroup">
+            <b>Virtual device</b>
+            <select id="recAvd" aria-label="Virtual device"></select>
+            <select id="recGfx" aria-label="Graphics">
+              <option value="auto">Graphics: fast (uses your GPU)</option>
+              <option value="software">Graphics: compatible (slower)</option>
+            </select>
+            <label class="opt inline"><input type="checkbox" id="recWindow"> Also show the emulator window</label>
+            <button class="btn mini solid" id="recStartAvd" onclick="Rec.startAvd()">Start</button>
+          </div>
+          <div class="mgroup">
+            <b>Phone over Wi-Fi</b>
+            <span class="fhint">Phone: Developer options &rsaquo; Wireless debugging. Enter the IP address and port shown there.</span>
+            <input type="text" id="recAddr" placeholder="192.168.0.12:37123" spellcheck="false" aria-label="Phone address">
+            <details class="pairbox"><summary>First time? Pair with code</summary>
+              <input type="text" id="recPairAddr" placeholder="Pairing IP:port" spellcheck="false" aria-label="Pairing address">
+              <input type="text" id="recPairCode" placeholder="6-digit code" inputmode="numeric" maxlength="6" aria-label="Pairing code">
+            </details>
+            <button class="btn mini" onclick="Rec.connectWifi()">Connect</button>
+          </div>
+          <div class="mgroup">
+            <b>Clean state</b>
+            <span class="fhint">Save the virtual device as it is now, and go back to it before recording or running tests.</span>
+            <div class="row2"><button class="btn mini" onclick="Rec.snapshot('save')">Save clean state</button>
+            <button class="btn mini" onclick="Rec.snapshot('load')">Reset to clean state</button></div>
+          </div>
+        </div>
+      </details>
+    </div>
+    <div class="appbox">
+      <div class="apkbox" title="APKs stay in the local Apps folder">
+        <select id="recApk" aria-label="APK"></select>
+        <button class="btn mini icon" id="recApkDel" onclick="Rec.deleteApk()" title="Remove this APK" aria-label="Remove this APK" disabled>&times;</button>
+        <button class="btn mini" onclick="Rec.pickApk()">Add APK&hellip;</button>
+        <input type="file" id="recApkFile" accept=".apk" hidden>
+        <button class="btn mini" id="recInstall" onclick="Rec.installApk()" disabled>Install</button>
+      </div>
+      <input type="text" id="recApp" list="recPkgs" placeholder="App ID, e.g. org.wikipedia" spellcheck="false" aria-label="App ID">
+      <datalist id="recPkgs"></datalist>
+      <label class="opt inline" title="Clear the app's data before launching"><input type="checkbox" id="recClear" checked> Fresh data</label>
+      <button class="btn mini solid" onclick="Rec.launch()">Launch app</button>
+    </div>
+  </div>
+  <div class="devproblem" id="recProblemDev" hidden></div>
+
+  <div class="studio">
+    <div class="card scol">
+      <div class="chead">
+        <h3>Steps <span class="dim" id="recCount"></span></h3>
+        <div class="hacts">
+          <details class="menu right" id="insMenu">
+            <summary class="btn mini">Insert &#9662;</summary>
+            <div class="menupop narrow">
+              <button onclick="Rec.insert('wait')">Wait for animations</button>
+              <button onclick="Rec.insert('hideKeyboard')">Hide keyboard</button>
+              <button onclick="Rec.insert('back')">Press Back</button>
+              <button onclick="Rec.insert('enter')">Press Enter</button>
+              <button onclick="Rec.insert('scroll')">Scroll down</button>
+              <button onclick="Rec.insert('erase')">Clear text</button>
+              <button onclick="Rec.insert('screenshot')">Screenshot</button>
+              <div class="msep"></div>
+              <button onclick="Rec.insert('repeat')">Repeat block</button>
+              <button onclick="Rec.insert('if')">If visible block</button>
+              <button onclick="Rec.insert('while')">Repeat while visible</button>
+              <button onclick="Rec.insert('retry')">Retry block</button>
+            </div>
+          </details>
+          <button class="btn mini" onclick="Rec.clearAll()">Clear</button>
+        </div>
+      </div>
+      <div class="selbar" id="recSelBar" hidden>
+        <span id="recSelCount"></span>
+        <button class="btn mini" onclick="Rec.wrap('repeat')">Repeat</button>
+        <button class="btn mini" onclick="Rec.wrap('if')">If visible</button>
+        <button class="btn mini" onclick="Rec.wrap('while')">While visible</button>
+        <button class="btn mini" onclick="Rec.wrap('retry')">Retry</button>
+        <button class="btn mini ghost" onclick="Rec.deleteSelected()">Delete</button>
+      </div>
+      <div class="rsteps" id="recSteps"></div>
+      <div class="flowmeta">
+        <div class="pair">
+          <label class="field"><span class="flabel">Flow file in Flows/</span>
+            <input type="text" id="recFlow" placeholder="Login/login_valid.yaml" spellcheck="false"></label>
+          <label class="field"><span class="flabel">Tags</span>
+            <input type="text" id="recTags" placeholder="smoke, login" spellcheck="false"></label>
+        </div>
+        <div class="dataline" id="recDataLine" hidden>
+          <span class="flabel">Test data</span>
+          <span id="recDataText"></span>
+          <button class="btn mini" onclick="Rec.chooseData()">Change</button>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn solid" id="recSave" onclick="Rec.save(false)">Save flow</button>
+        <button class="btn" id="recSaveRun" onclick="Rec.save(true)">Save and run</button>
+      </div>
+    </div>
+
+    <div class="stagecol">
+      <div class="modebar" role="group" aria-label="How to record">
+        <button class="mode" id="recMode-record" onclick="Rec.setMode('record')">Record</button>
+        <button class="mode" id="recMode-device" onclick="Rec.setMode('device')">From device</button>
+        <button class="mode" id="recMode-assert" onclick="Rec.setMode('assert')">Add check</button>
+        <button class="mode" id="recMode-interact" onclick="Rec.setMode('interact')">Just use</button>
+      </div>
+      <div class="modehint" id="recModeHint"></div>
+      <div class="stage" id="recStage" data-state="empty">
+        <div class="phone">
+          <canvas id="recScreen" aria-label="Device screen"></canvas>
+          <div class="box" id="recBox" hidden></div>
+          <div class="spot" id="recSpot"></div>
+        </div>
+        <div class="stage-empty" id="recEmpty">Choose a device, or use Add device to start one.</div>
+      </div>
+      <div class="typebar">
+        <input type="text" id="recText" placeholder="Tap a field on the device, type here, press Enter" autocomplete="off" spellcheck="false" aria-label="Text to type">
+        <button class="btn solid" onclick="Rec.typeText()">Type</button>
+      </div>
+      <div class="navbar" role="group" aria-label="Device buttons">
+        <button class="btn mini" onclick="Rec.nav('back')">Back</button>
+        <button class="btn mini" onclick="Rec.nav('home')">Home</button>
+        <button class="btn mini" onclick="Rec.nav('enter')">Enter</button>
+        <button class="btn mini" onclick="Rec.nav('hideKeyboard')">Hide keyboard</button>
+        <button class="btn mini" onclick="Rec.nav('scroll')">Scroll</button>
+      </div>
+    </div>
+
+    <div class="card icol">
+      <div class="ptabs" role="tablist">
+        <button class="ptab active" id="ptab-flow" role="tab" onclick="Rec.panel('flow')">Flow</button>
+        <button class="ptab" id="ptab-el" role="tab" onclick="Rec.panel('el')">Element</button>
+        <span class="grow"></span>
+        <button class="btn mini solid" id="recApply" onclick="Rec.applyYaml()" hidden>Apply changes</button>
+      </div>
+      <div id="pane-flow">
+        <div class="derr" id="recProblem"></div>
+        <textarea class="yaml" id="recYaml" spellcheck="false" aria-label="Flow YAML" placeholder="The flow appears here as you record. You can also edit it directly."></textarea>
+        <div class="fhint">Edit freely: conditions, loops and any Maestro command. Press Apply (Ctrl+Enter) to update the steps.</div>
+      </div>
+      <div id="pane-el" hidden>
+        <div id="recInspect"><div class="empty">Tap something on the device to see what Understudy will target.</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="tab-run">
+  <div class="pagehead">
+    <h2>Run Flows</h2>
+    <p>Prepare the data, choose the flows, arrange the queue, and run. Each flow writes its own report.</p>
+  </div>
+
+  <div class="card">
+    <div class="chead"><div><span class="eyebrow">Step 1</span><h3>Prepare data</h3></div></div>
+    <div class="toolbar" style="margin:0;">
+      <button id="prepBtn" class="btn solid" onclick="prepareData()">Prepare Data</button>
+      <span class="status">Converts the Excel data into Maestro scripts. Re-run after changing data.</span>
+      <span style="flex:1"></span>
+      <button class="btn mini" onclick="openFolder('reports')">Open Reports</button>
+      <button class="btn mini" onclick="openFolder('testdata')">Open TestData</button>
+      <button class="btn mini" onclick="openFolder('flowbackups')">Open FlowBackups</button>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="chead"><div><span class="eyebrow">Step 2</span><h3>Choose flows</h3></div></div>
+      <div class="toolbar">
+        <input type="text" id="filter" placeholder="Filter flows&hellip;" oninput="renderFlows()" style="flex:1; min-width:120px;">
+        <button class="btn" onclick="selAll(true)">Select visible</button>
+        <button class="btn" onclick="selAll(false)">Clear</button>
+        <button class="btn" onclick="loadFlows()">Reload</button>
+      </div>
+      <div class="tagbar" id="tagbar"></div>
+      <div class="flowlist" id="flows">Loading&hellip;</div>
+      <div class="hint">Flows run in the order you tick them. Reorder in the queue panel.</div>
+    </div>
+
+    <div class="card">
+      <div class="chead"><div><span class="eyebrow">Step 3</span><h3>Run queue</h3></div></div>
+      <div class="suitebar">
+        <select id="suiteSel" title="Saved test suites"><option value="">Test suites&hellip;</option></select>
+        <button class="btn mini" id="suiteLoad" onclick="suiteLoad()">Load</button>
+        <button class="btn mini solid" id="suiteRun" onclick="suiteRun()">Run suite</button>
+        <button class="btn mini" onclick="suiteSave()">Save queue as suite</button>
+        <button class="btn mini" onclick="suiteDelete()">Delete</button>
+      </div>
+      <div class="flowlist" id="queue" style="max-height:420px;"></div>
+      <label class="opt"><input type="checkbox" id="stopOnFail"> Stop the queue if a flow fails</label>
+      <div class="hint">Rows: leave empty for row 1, or type <code>all</code>, <code>2,7,13</code>, <code>2-5</code>. Each flow uses its own Excel sheet; each row runs as a separate test with its own report.</div>
+      <div class="actions">
+        <button id="runBtn"     class="btn solid big" onclick="runSelected()">Run Selected</button>
+        <button id="runAllBtn"  class="btn big"       onclick="runAll()">Run All</button>
+        <button id="stopBtn"    class="btn stop big"  onclick="stopRun()" disabled>Stop</button>
+        <button id="rerunBtn"   class="btn big"       onclick="rerunFailed()" disabled title="Rerun only the flows that failed in the last run">Rerun failed</button>
+      </div>
+      <div class="status" id="status" style="margin-top:14px;"></div>
+    </div>
+  </div>
+
+  <div class="card" id="liveCard">
+    <div class="chead">
+      <div><span class="eyebrow">Live run</span><h3 id="liveTitle">Idle</h3></div>
+      <div class="livestats" id="liveStats"></div>
+    </div>
+    <div class="pbar"><div id="pfill"></div></div>
+    <div class="livegrid">
+      <div class="stepbox" id="steps"><div class="empty">Steps appear here while a flow runs: which command is running, what passed, and where it failed.</div></div>
+      <div class="datapanel" id="liveData"><div class="empty">The Excel row used by the running flow shows here.</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="chead"><div><span class="eyebrow">Results</span><h3>Results</h3></div></div>
+    <div id="results"><div class="empty">No runs yet.</div></div>
+  </div>
+
+  <div class="card">
+    <div class="chead">
+      <div><span class="eyebrow">Console</span><h3>Live output</h3></div>
+      <div style="display:flex; gap:6px;">
+        <button class="btn mini" onclick="copyLog()">Copy log</button>
+        <button class="btn mini" onclick="clearLog()">Clear</button>
+      </div>
+    </div>
+    <pre id="log">Waiting&hellip;</pre>
+  </div>
+
+  <div class="card">
+    <div class="rhead">
+      <div><span class="eyebrow">Report</span><h3 style="margin:0;">Detailed view</h3></div>
+      <div style="display:flex; gap:6px; align-items:center;">
+        <select id="reportSelect" onchange="showReport(this.value)"></select>
+        <button class="btn mini" onclick="loadReports()">Refresh</button>
+        <button class="btn mini" onclick="openReport()">Open in new tab</button>
+      </div>
+    </div>
+    <iframe id="reportFrame" src="about:blank"></iframe>
+  </div>
+</section>
+
+<section id="tab-data" hidden>
+  <div class="pagehead">
+    <h2>Test Data</h2>
+    <p>All Excel files live under <code>TestData/</code>. Edit cells, insert or delete rows and columns anywhere, add sheets, and create new files. A backup is kept before every save.</p>
+  </div>
+  <div id="xwarn"></div>
+  <div class="xgrid">
+    <div class="card">
+      <div class="chead"><div><span class="eyebrow">Library</span><h3>Excel files</h3></div></div>
+      <div class="toolbar">
+        <button class="btn solid" onclick="newFile()">+ New file</button>
+        <button class="btn" onclick="loadExcelFiles()">Refresh</button>
+      </div>
+      <div class="flowlist" id="xfiles" style="max-height:60vh;">Loading&hellip;</div>
+    </div>
+    <div class="card">
+      <div class="chead"><div><span class="eyebrow">Editor</span><h3 id="xtitle">Select a file to begin</h3></div></div>
+      <div id="xmeta" class="hint" hidden></div>
+      <div class="stabs" id="stabs"></div>
+      <div class="tablebox" id="xtable" hidden></div>
+      <div class="actions" id="xactions" hidden>
+        <button class="btn solid" id="saveBtn" onclick="saveExcel(false)">Save</button>
+        <button class="btn solid" id="savePrepBtn" onclick="saveExcel(true)">Save &amp; Prepare Data</button>
+        <span style="flex:1"></span>
+        <button class="btn" onclick="addRowEnd()">+ Row at end</button>
+        <button class="btn" onclick="addColEnd()">+ Column at end</button>
+        <span class="status" id="xstatus"></span>
+      </div>
+      <div class="hint" id="xhint" hidden>Hover a row number or column letter: <b>+&uarr;</b> / <b>+&darr;</b> insert a row above / below, <b>+&larr;</b> / <b>+&rarr;</b> insert a column left / right, <b>&minus;</b> deletes. Edited cells are highlighted. Formula and date cells are read-only.</div>
+    </div>
+  </div>
+</section>
+
+<section id="tab-editor" hidden>
+  <div class="pagehead">
+    <h2>Editor</h2>
+    <p>Browse and edit Maestro flows. Every save keeps a backup in <code>FlowBackups/</code>. Syntax highlighting turns on automatically when online.</p>
+  </div>
+  <div class="xgrid">
+    <div class="card">
+      <div class="chead"><div><span class="eyebrow">Flows</span><h3>Choose a flow</h3></div></div>
+      <div class="toolbar">
+        <input type="text" id="edFilter" placeholder="Filter flows&hellip;" oninput="renderFlowEditorList()" style="flex:1; min-width:120px;">
+        <button class="btn" onclick="loadFlows()">Refresh</button>
+        <button class="btn" onclick="newFlowDialog()">+ New flow</button>
+      </div>
+      <div class="flowlist" id="edList" style="max-height:60vh;">Loading&hellip;</div>
+    </div>
+    <div class="card">
+      <div class="chead">
+        <div><span class="eyebrow">Editing</span><h3 id="edTitle">Select a flow to begin</h3></div>
+        <div style="display:flex; gap:6px;">
+          <button class="btn solid" id="edSave"   onclick="saveFlow()"   disabled>Save</button>
+          <button class="btn"       id="edRevert" onclick="revertFlow()" disabled>Revert</button>
+          <button class="btn"       id="edRun"    onclick="runCurrentFlow()" disabled>Run this flow</button>
+        </div>
+      </div>
+      <div id="edMeta" class="hint" hidden></div>
+      <div id="edWrap" class="editorbox" hidden>
+        <textarea id="edArea" spellcheck="false" placeholder="Flow content will appear here&hellip;"></textarea>
+      </div>
+      <div class="hint" id="edHint" hidden>Unsaved changes are highlighted in the header.</div>
+    </div>
+  </div>
+</section>
+<section id="tab-setup" hidden>
+  <div class="pagehead">
+    <h2>Setup</h2>
+    <p>What this computer needs to record and run tests. Everything is free and runs locally. Your APKs, flows and data never leave this PC.</p>
+  </div>
+  <div class="card">
+    <div class="chead"><h3>Checklist</h3>
+      <div style="display:flex; gap:6px; align-items:center;"><span class="status" id="doctorSum"></span>
+      <button class="btn mini" id="doctorBtn" onclick="runDoctor()">Check again</button></div></div>
+    <div id="doctor"></div>
+  </div>
+  <div class="card">
+    <div class="chead"><h3>Android tools without Android Studio</h3>
+      <button class="btn mini solid" onclick="installAndroid()">Install Android tools</button></div>
+    <p class="prose">Installs only what Understudy needs from Google's official server: adb, the emulator and one light system image, then creates a virtual device called Understudy_Pixel (2 GB RAM). About 1.5 GB to download. A window shows the progress. Android Studio is not needed and can be uninstalled.</p>
+  </div>
+  <div class="card">
+    <div class="chead"><h3>Typing non-English text</h3></div>
+    <p class="prose">English text works out of the box. To type Bengali or other scripts, install the free, open-source ADB Keyboard app on the device once (add its APK on the Record tab and press Install). Understudy switches to it only while typing and switches back afterwards.</p>
+  </div>
+  <div class="card">
+    <div class="chead"><h3>Folders</h3></div>
+    <div class="toolbar" style="margin:0;">
+      <button class="btn mini" onclick="openFolder('project')">Project</button>
+      <button class="btn mini" onclick="openFolder('flows')">Flows</button>
+      <button class="btn mini" onclick="openFolder('testdata')">TestData</button>
+      <button class="btn mini" onclick="openFolder('apps')">Apps (APKs)</button>
+      <button class="btn mini" onclick="openFolder('reports')">Reports</button>
+      <button class="btn mini" onclick="openFolder('logs')">Logs</button>
+    </div>
+  </div>
+</section>
+
+<section id="tab-dashboard" hidden>
+  <div class="pagehead">
+    <h2>Dashboard</h2>
+    <p>Trends from your run history (saved in <code>History/</code>). Compare any two runs to see what got fixed or broke.</p>
+  </div>
+  <div class="kpis" id="kpis"></div>
+  <div class="dgrid">
+    <div class="card"><div class="chead"><div><span class="eyebrow">Last 30 runs</span><h3>Passed vs failed</h3></div></div><div id="chRuns" class="chart"></div></div>
+    <div class="card"><div class="chead"><div><span class="eyebrow">Last 30 runs</span><h3>Pass rate</h3></div></div><div id="chRate" class="chart"></div></div>
+    <div class="card"><div class="chead"><div><span class="eyebrow">All history</span><h3>Most failures</h3></div></div><div id="chFail" class="chart"></div></div>
+    <div class="card"><div class="chead"><div><span class="eyebrow">Average</span><h3>Slowest tests</h3></div></div><div id="chSlow" class="chart"></div></div>
+  </div>
+  <div class="card"><div class="chead"><div><span class="eyebrow">Last 10 runs</span><h3>Flaky tests</h3></div><span class="hint" style="margin:0;">Same flow and row both passed and failed, newest on the right</span></div><div id="flaky"></div></div>
+  <div class="card">
+    <div class="chead"><div><span class="eyebrow">Report difference</span><h3>Compare two runs</h3></div></div>
+    <div class="toolbar">
+      <label class="qlbl">Before</label><select id="cmpA" onchange="renderCompare()"></select>
+      <label class="qlbl">After</label><select id="cmpB" onchange="renderCompare()"></select>
+    </div>
+    <div id="cmpOut"></div>
+  </div>
+</section>
+</main>
+
+<footer><div class="wrap"><span id="brandFoot">Understudy</span> &nbsp;&middot;&nbsp; <a href="mailto:daiyanhasin07@gmail.com">daiyanhasin07@gmail.com</a></div></footer>
+</div>
+
+<script src="ui/secure-fetch.js"></script>
+<script src="app.js"></script>
+<script src="ui/run-extras.js"></script>
+<script src="ui/dashboard.js"></script>
+<script src="ui/setup.js"></script>
+<script src="ui/recorder.js"></script>
+</body></html>
