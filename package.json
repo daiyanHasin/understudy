@@ -1,7 +1,7 @@
 {
   "name": "understudy",
-  "version": "1.1.0",
-  "description": "Record mobile tests on a virtual device, make them data-driven with Excel, and run them with Maestro. Runs 100% locally.",
+  "version": "2.0.0",
+  "description": "Record Android tests by clicking, make them data-driven with Excel, and run them with Maestro. Runs 100% locally.",
   "private": true,
   "license": "UNLICENSED",
   "author": "Hasin Md. Daiyan <daiyanhasin07@gmail.com>",
@@ -9,7 +9,7 @@
   "scripts": {
     "start": "node web-gui.js",
     "start:console": "node web-gui.js --no-open",
-    "prepare-data": "node -e \"require('./lib/prepare').prepareData(t=>process.stdout.write(t))\""
+    "prepare-data": "node -e \"require('./src/data/prepare').prepareData(t=>process.stdout.write(t))\""
   },
   "engines": {
     "node": ">=18"

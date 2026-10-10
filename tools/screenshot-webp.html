@@ -1,0 +1,71 @@
+<!doctype html>
+<!-- Understudy - Copyright (c) 2026 Hasin Md. Daiyan. All rights reserved. See LICENSE.
+     Screenshot converter: PNG (docs/screenshots) -> WebP (website/assets/img).
+     Open this file in Edge or Chrome (double-click). Works offline; nothing is uploaded. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Understudy - screenshots to WebP</title>
+<style>
+  body { font: 14px/1.5 system-ui, sans-serif; max-width: 760px; margin: 40px auto; padding: 0 20px; color: #1d1f24; }
+  h1 { font-size: 20px; } code { background: #f0f1f3; padding: 1px 5px; border-radius: 4px; }
+  #drop { border: 2px dashed #b9bdc6; border-radius: 10px; padding: 40px; text-align: center; color: #5b616e; cursor: pointer; }
+  #drop.over { border-color: #d98a1c; background: #fff8ee; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid #eceef1; }
+  .row img { width: 120px; height: 75px; object-fit: cover; border-radius: 4px; border: 1px solid #ddd; }
+  .row span { flex: 1; } .row a { color: #b06d0e; font-weight: 600; }
+  label { margin-right: 16px; }
+</style>
+</head>
+<body>
+<h1>Screenshots → WebP for the website</h1>
+<p>Drop the PNGs from <code>docs/screenshots/</code>. Each is resized to the website size and saved as WebP with the same name.
+Put the downloaded files into <code>website/assets/img/</code>, replacing the old ones.</p>
+<p>
+  <label>Width <input id="w" type="number" value="2000" min="400" max="4000" step="10"></label>
+  <label>Height <input id="h" type="number" value="1250" min="300" max="4000" step="10"></label>
+  <label>Quality <input id="q" type="number" value="0.86" min="0.5" max="1" step="0.01"></label>
+</p>
+<div id="drop">Drop PNG files here, or click to choose</div>
+<input id="pick" type="file" accept="image/png,image/jpeg" multiple hidden>
+<p><button id="all" hidden>Download all</button></p>
+<div id="out"></div>
+<script>
+(function () {
+  var drop = document.getElementById("drop"), pick = document.getElementById("pick"), out = document.getElementById("out"), all = document.getElementById("all");
+  var links = [];
+  drop.onclick = function () { pick.click(); };
+  pick.onchange = function () { handle(pick.files); pick.value = ""; };
+  drop.ondragover = function (e) { e.preventDefault(); drop.classList.add("over"); };
+  drop.ondragleave = function () { drop.classList.remove("over"); };
+  drop.ondrop = function (e) { e.preventDefault(); drop.classList.remove("over"); handle(e.dataTransfer.files); };
+  all.onclick = function () { links.forEach(function (a, i) { setTimeout(function () { a.click(); }, i * 300); }); };
+
+  function handle(files) { Array.prototype.forEach.call(files, convert); }
+  function convert(file) {
+    var W = +document.getElementById("w").value, H = +document.getElementById("h").value, Q = +document.getElementById("q").value;
+    var img = new Image();
+    img.onload = function () {
+      var c = document.createElement("canvas"); c.width = W; c.height = H;
+      var g = c.getContext("2d"); g.imageSmoothingQuality = "high";
+      // Cover: fill the frame, keep the top-left (the window title and sidebar) in view
+      var k = Math.max(W / img.width, H / img.height);
+      g.drawImage(img, 0, 0, img.width * k, img.height * k);
+      c.toBlob(function (blob) {
+        if (!blob || blob.type !== "image/webp") { alert("This browser can't make WebP. Use Edge or Chrome."); return; }
+        var name = file.name.replace(/\.(png|jpe?g)$/i, "") + ".webp";
+        var row = document.createElement("div"); row.className = "row";
+        var th = document.createElement("img"); th.src = URL.createObjectURL(blob);
+        var t = document.createElement("span"); t.textContent = name + " — " + Math.round(blob.size / 1024) + " KB";
+        var a = document.createElement("a"); a.href = th.src; a.download = name; a.textContent = "Download";
+        row.appendChild(th); row.appendChild(t); row.appendChild(a); out.appendChild(row);
+        links.push(a); all.hidden = links.length < 2;
+      }, "image/webp", Q);
+      URL.revokeObjectURL(img.src);
+    };
+    img.src = URL.createObjectURL(file);
+  }
+})();
+</script>
+</body>
+</html>

@@ -54,10 +54,18 @@ not part of this repository. Their license files are in `node_modules/<package>/
 
 ---
 
+## Optional, not bundled: Ollama
+
+The optional AI helper talks to [Ollama](https://ollama.com) (MIT) on
+`127.0.0.1:11434` if the user installs it. Models it downloads (default
+Qwen2.5-Coder, Apache-2.0) are governed by their own licenses.
+
+---
+
 ## Fonts
 
-The UI requests **Inter** and **JetBrains Mono** from Google Fonts (SIL Open
-Font License 1.1) when online, and falls back to system fonts when offline.
+The UI ships **Inter**, **JetBrains Mono** and **Instrument Serif**
+(SIL Open Font License 1.1) in `assets/fonts/`, so it starts without internet.
 
 ---
 

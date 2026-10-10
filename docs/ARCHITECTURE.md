@@ -4,7 +4,7 @@ Understudy (formerly X-Maestro Flow Runner) is a **local web application**: a sm
 
 ```text
 ┌──────────────────────── Browser (http://understudy.localhost:4545) ───────────────────────┐
-│  Run Flows │ Test Data │ Editor │ Dashboard            app.js + ui/*.js + styles.css      │
+│  Run Flows │ Test Data │ Editor │ Dashboard            app/ + src/*/*.ui.js      │
 └───────────────▲──────────────────────────────┬────────────────────────────────────────────┘
        live events (SSE /api/stream)           │ REST (fetch /api/...)
 ┌───────────────┴──────────────────────────────▼───────────── Node.js (web-gui.js) ─────────┐
@@ -34,20 +34,20 @@ Understudy (formerly X-Maestro Flow Runner) is a **local web application**: a sm
 
 | File | Responsibility |
 |---|---|
-| `web-gui.js` | HTTP routes, static files (`/`, `/app.js`, `/ui/*.js`, `/reports/*`, `/runs/*.png`), Host check, startup data preparation |
-| `lib/runner.js` | Lists flows (path, appId, tags, sheets), expands queue items into jobs, runs Maestro one job at a time, streams events, saves history |
-| `lib/flow-data.js` | Scans a flow's `runScript` lines (and its `runFlow` sub-flows) to find Excel sheets; parses row selections |
-| `lib/prepare.js` | Converts every sheet into a self-contained data script and a JSON copy |
-| `lib/live-steps.js` | Tails `maestro.log` for `RUNNING / COMPLETED / FAILED / SKIPPED / WARNED` lines; finds failure screenshots |
-| `lib/excel.js` | Reads and writes workbooks for the editor: cell edits, row/column insert and delete, new sheets and files |
-| `lib/flows-io.js` | Read, save, duplicate, rename and delete flows (with backups); peeks `appId` and `tags` |
-| `lib/history.js` | Appends finished runs to `History/history.json` (last 300) |
-| `lib/suites.js` | Saves named suites to `Suites/suites.json` |
+| `web-gui.js` | HTTP routes, static files (`/`, `/app.js`, `/src/*/*.ui.js`, `/reports/*`, `/runs/*.png`), Host check, startup data preparation |
+| `src/run/runner.js` | Lists flows (path, appId, tags, sheets), expands queue items into jobs, runs Maestro one job at a time, streams events, saves history |
+| `src/run/flow-data.js` | Scans a flow's `runScript` lines (and its `runFlow` sub-flows) to find Excel sheets; parses row selections |
+| `src/data/prepare.js` | Converts every sheet into a self-contained data script and a JSON copy |
+| `src/run/live-steps.js` | Tails `maestro.log` for `RUNNING / COMPLETED / FAILED / SKIPPED / WARNED` lines; finds failure screenshots |
+| `src/data/excel.js` | Reads and writes workbooks for the editor: cell edits, row/column insert and delete, new sheets and files |
+| `src/data/flows-io.js` | Read, save, duplicate, rename and delete flows (with backups); peeks `appId` and `tags` |
+| `src/reports/history.js` | Appends finished runs to `History/history.json` (last 300) |
+| `src/run/suites.js` | Saves named suites to `Suites/suites.json` |
 | `app.js` | Core UI: tabs, flow list, queue, run control, live panel, results, Excel and flow editors, event hooks |
-| `ui/run-extras.js` | Tags, suites, data preview popup, "data used" panel |
-| `ui/dashboard.js` | KPIs, SVG charts, flaky tests, compare two runs |
+| `src/run/run-extras.ui.js` | Tags, suites, data preview popup, "data used" panel |
+| `src/reports/dashboard.ui.js` | KPIs, SVG charts, flaky tests, compare two runs |
 
-`ui/*.js` plug into `app.js` through a tiny hook list (`hooks.flowsLoaded`, `hooks.showSteps`, `hooks.runDone`, `hooks.tab`), so new features can be added without growing `app.js`.
+`src/*/*.ui.js` plug into `app.js` through a tiny hook list (`hooks.flowsLoaded`, `hooks.showSteps`, `hooks.runDone`, `hooks.tab`), so new features can be added without growing `app.js`.
 
 ## Data-driven testing
 
@@ -141,9 +141,9 @@ All file paths are resolved and checked to stay inside `Flows/`, `TestData/`, `R
 
 ## Extending
 
-- **New UI feature:** add `ui/<feature>.js`, include it in `index.html`, and register on `hooks.*`.
-- **New API:** add a route in `web-gui.js` and put the logic in `lib/<feature>.js`.
-- **New run behaviour:** extend `buildJobs()` / `runFlows()` in `lib/runner.js` and emit new event types.
+- **New UI feature:** add `src/<feature>/<feature>.ui.js`, include it in `app/index.html`, and register on `hooks.*`.
+- **New API:** add a route in `web-gui.js` and put the logic in `src/<feature>/<feature>.js`.
+- **New run behaviour:** extend `buildJobs()` / `runFlows()` in `src/run/runner.js` and emit new event types.
 
 
 ---
@@ -154,20 +154,20 @@ All file paths are resolved and checked to stay inside `Flows/`, `TestData/`, `R
 
 | File | Job |
 |---|---|
-| `lib/security.js` | Per-start session token, HttpOnly SameSite=Strict cookie, token header + Origin check on every change, Host check (DNS rebinding), body size limits, response headers, sandboxed reports |
-| `lib/android.js` | Finds the Android SDK; adb/emulator wrappers; devices, virtual devices, Wi-Fi phones, snapshots, raw frames, input, layout cache, app launch. Uses `execFile` with argument arrays (no shell); every device-side argument is single-quoted |
-| `lib/recorder.js` | Picks the element under a tap, builds selector candidates, generates Maestro YAML, saves the flow and writes data-driven values into Excel |
-| `lib/capture.js` | "From device" mode: reads touches with `getevent`, keeps only touches in the app, reads typed text back from the layout |
-| `lib/doctor.js` | Setup checklist (Node, Java, Maestro, SDK, adb, emulator, acceleration, virtual devices) |
-| `lib/app-window.js` | Opens the UI in an Edge/Chrome app window |
-| `ui/secure-fetch.js` | Adds the session token to every state-changing request; shows a reload banner if the server restarted |
-| `ui/setup.js` | Record/Setup tab switching (without changing `app.js`), Setup checklist, Quit |
-| `ui/recorder.js` | Record tab: device stage, recording modes, value dialog (fixed text or test data), steps, YAML preview, save |
+| `src/core/security.js` | Per-start session token, HttpOnly SameSite=Strict cookie, token header + Origin check on every change, Host check (DNS rebinding), body size limits, response headers, sandboxed reports |
+| `src/device/android.js` | Finds the Android SDK; adb/emulator wrappers; devices, virtual devices, Wi-Fi phones, snapshots, raw frames, input, layout cache, app launch. Uses `execFile` with argument arrays (no shell); every device-side argument is single-quoted |
+| `src/record/recorder.js` | Picks the element under a tap, builds selector candidates, generates Maestro YAML, saves the flow and writes data-driven values into Excel |
+| `src/record/capture.js` | "From device" mode: reads touches with `getevent`, keeps only touches in the app, reads typed text back from the layout |
+| `src/setup/doctor.js` | Setup checklist (Node, Java, Maestro, SDK, adb, emulator, acceleration, virtual devices) |
+| `src/core/app-window.js` | Opens the UI in an Edge/Chrome app window |
+| `src/core/secure-fetch.ui.js` | Adds the session token to every state-changing request; shows a reload banner if the server restarted |
+| `src/setup/setup.ui.js` | Record/Setup tab switching (without changing `app.js`), Setup checklist, Quit |
+| `src/record/recorder.ui.js` | Record tab: device stage, recording modes, value dialog (fixed text or test data), steps, YAML preview, save |
 | `Understudy.vbs` | Windows launcher with no console window; first-run install; optional desktop shortcut |
 
 ### Request rules
 
-- `GET /`, `/styles.css`, `/app.js`, `/ui/*.js`, `/assets/*`, `/manifest.webmanifest` are public (no data).
+- `GET /`, `/styles.css`, `/app.js`, `/src/*/*.ui.js`, `/assets/*`, `/manifest.webmanifest` are public (no data).
 - Everything under `/api/`, `/reports/*.html` and `/runs/` needs the session cookie.
 - Every non-GET request also needs the `X-Understudy-Token` header and, if an `Origin` header is present, one of our own origins.
 - Report assets (images inside a report) are served without the cookie because the sandboxed report frame has none.
@@ -193,3 +193,73 @@ All file paths are resolved and checked to stay inside `Flows/`, `TestData/`, `R
 | `POST /api/rec/save` | Write test data, then the flow, then regenerate data scripts |
 | `POST /api/capture/start` / `stop`, `GET /api/capture/poll` | "From device" mode (getevent) |
 | `POST /api/shutdown` | Quit |
+
+## Added in Understudy 1.2
+
+### Paths and projects
+`src/core/paths.js` is the only place that knows where project folders are. Every
+module asks it (`P.flows`, `P.reports`, ...) on each use, so the open project
+can change at run time. `src/projects/projects.js` keeps the project list in
+`%APPDATA%\Understudy\projects.json` (or `~/.understudy`). The install folder is
+registered as "Default project" on first start. `--project <folder>` or
+`UNDERSTUDY_PROJECT` opens a specific one.
+
+### Device core
+```
+ window (src/record/recorder.ui.js)            PC (src/device/android.js)                 device
+ canvas <- RGBA frame <- /api/device/frame  <-  gunzip + shrink to 540 px wide  <-  screencap | gzip -1
+ click  -> /api/rec/inspect -> element menu  ->  /api/device/input  ->  adb input tap / text / swipe
+```
+- Frames are fetched one after another (no fixed interval). Phones without
+  `gzip` fall back to raw `screencap` automatically, once per device.
+- Screen changes: frame hashes that ignore the status bar and A-B-A-B cursor
+  blinking bump a per-device counter (`seq`). A layout is cached with the `seq`
+  it was read at; `/api/rec/inspect` accepts the `seq` the user was looking at.
+- A click in Record mode taps nothing: it opens the element menu, and the chosen
+  action is both recorded and sent to the device.
+- `uiautomator` calls are queued per device (`withUiLock`). A blocked read
+  ("Killed", "could not get idle state" ...) force-stops known holders
+  (Maestro and Appium drivers) when no run is active, then retries once.
+- Layout dumps use `--windows` where supported; nodes carry their window and
+  layer, and `recorder.nodesAt` keeps only the top window under a point.
+- Non-English text is typed through the ADB Keyboard app when it is installed.
+
+### Run from a step
+`src/run/partial.js` writes `.us-from-<n>-<flow>.yaml` next to the flow: the
+header, every `runScript` / `evalScript` (and other setup commands) before
+step n, then step n onwards. Dot-files are never listed as flows; the copy is
+deleted when the run ends.
+
+### Reports
+The runner keeps each job's steps (from `maestro.log`), copies failure
+screenshots to `Reports/_shots/<run>/`, stores both in History (steps only
+for the newest 40 runs) and writes `Reports/Understudy-Run-<date>.html`
+(`src/reports/report.js`, self-contained). The Reports tab reads
+`/api/history/run?id=`.
+
+### New endpoints
+| Method | Path | Purpose |
+|---|---|---|
+| GET  | `/api/projects` | project list |
+| POST | `/api/projects/open\|create\|add\|rename\|forget` | manage projects (blocked during runs) |
+| GET  | `/api/device/layout?serial=` | every element on screen (hover inspector) |
+| GET  | `/api/device/apps?serial=` | launchable + user apps |
+| POST | `/api/device/wifi` | USB phone -> Wi-Fi |
+| POST | `/api/device/openlink` | open a URL on the device |
+| GET/POST | `/api/system/processes`, `/api/system/free` | emulator / adb / Studio memory |
+| GET  | `/api/flow/commands?path=` | top-level steps (run-from-step picker) |
+| GET  | `/api/history/run?id=` | one run with steps |
+| POST | `/api/report/write` | (re)write a run's HTML report |
+| GET/POST | `/api/ai/status\|install\|pull\|remove\|enable\|generate` | optional AI helper |
+
+## Added before the 1.2.0 release
+
+| Module | Role |
+|---|---|
+| `src/device/wifi.js` | Plain-language reason a Wi-Fi phone can't be reached: TCP probe (3 s) plus a check of the PC's own networks. Used by `android.pair()`, `android.connect()`, `pairing.js` and `POST /api/device/wifi-check`. |
+| `src/device/animations.js` | Phone animation scales to 0 while recording (`POST /api/device/animations`), saved first to `logs/animations-restore.json`, restored on disconnect, quit and the next start. |
+| `tools/install-deps.ps1` | First-start `npm install` that works behind HTTPS inspection: builds `tools/certs/company-ca.pem`, used through `NODE_EXTRA_CA_CERTS` by npm and by Understudy. |
+
+Selectors now follow Maestro's matching rules (`recorder.matches()`): text matches text, label or hint; the deepest match wins; `index` counts top-to-bottom, then left-to-right. Candidates: ID, text/label/placeholder, ID + text (same element), Nth match (`index`), screen position.
+
+For "which file do I change for X", see the folder map in the [README](../README.md#where-things-live).

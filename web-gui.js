@@ -14,7 +14,17 @@
  *   lib/android.js        SDK, adb, emulator, Wi-Fi phones, snapshots, frames, input, layout
  *   lib/recorder.js       selectors, steps <-> YAML, save flow + test data
  *   lib/capture.js        turns taps made on the device itself into steps
+ *   lib/paths.js          where the open project's folders are
+ *   lib/projects.js       project list (install once, many projects)
+ *   lib/partial.js        run a flow from step N with its data reloaded
+ *   lib/report.js         self-contained HTML report per run
+ *   lib/ai.js             optional local AI helper (Ollama)
  *   lib/doctor.js         Setup checks
+ *   lib/adb-setup.js      in-app install of Google's platform-tools (adb, ~8 MB)
+ *   lib/pairing.js        Wi-Fi phones paired by QR code (adb mdns)
+ *   lib/wifi.js           why a Wi-Fi connection fails (reachability, networks) in plain words
+ *   lib/animations.js     phone animations off while recording, restored afterwards
+ *   lib/qr.js             QR code encoder (SVG)
  *   lib/app-window.js     opens the UI in its own app window
  *   lib/runner.js         flow discovery, Maestro runs, jobs, SSE events
  *   lib/prepare.js        Excel -> Scripts/**.js data providers
@@ -31,6 +41,7 @@
  *   --hidden    started by Understudy.vbs: no console, stops itself when the
  *               window has been closed for a while and nothing is running
  *   --no-open   don't open a window (e.g. you open the address yourself)
+ *   --project <folder>   open this project instead of the last one
  */
 
 const http = require("http");
@@ -38,18 +49,28 @@ const fs   = require("fs");
 const path = require("path");
 const { execFile } = require("child_process");
 
-const security = require("./lib/security");
-const state    = require("./lib/state");
-const runner   = require("./lib/runner");
-const excel    = require("./lib/excel");
-const flowIo   = require("./lib/flows-io");
-const history  = require("./lib/history");
-const suites   = require("./lib/suites");
-const android  = require("./lib/android");
-const recorder = require("./lib/recorder");
-const doctor   = require("./lib/doctor");
-const appWin   = require("./lib/app-window");
-const capture  = require("./lib/capture");
+const security = require("./src/core/security");
+const state    = require("./src/core/state");
+const runner   = require("./src/run/runner");
+const excel    = require("./src/data/excel");
+const flowIo   = require("./src/data/flows-io");
+const history  = require("./src/reports/history");
+const suites   = require("./src/run/suites");
+const android  = require("./src/device/android");
+const recorder = require("./src/record/recorder");
+const doctor   = require("./src/setup/doctor");
+const appWin   = require("./src/core/app-window");
+const capture  = require("./src/record/capture");
+const P        = require("./src/core/paths");
+const projects = require("./src/projects/projects");
+const partial  = require("./src/run/partial");
+const report   = require("./src/reports/report");
+const ai       = require("./src/ai/ai");
+const prepare  = require("./src/data/prepare");
+const adbSetup = require("./src/device/adb-setup");
+const pairing  = require("./src/device/pairing");
+const wifi     = require("./src/device/wifi");
+const animations = require("./src/device/animations");
 
 // Browsers send *.localhost to this computer automatically: no hosts-file change needed.
 const HOST_NAME   = "understudy.localhost";
@@ -58,14 +79,15 @@ const URL_MAIN    = "http://" + HOST_NAME + ":" + PORT;
 const HIDDEN      = process.argv.includes("--hidden");
 const NO_OPEN     = process.argv.includes("--no-open");
 const IDLE_MS     = 3 * 60 * 1000;
-const APPS_DIR    = path.join(__dirname, "Apps");
 const APK_LIMIT   = 800 * 1024 * 1024;
 
-const PROJECT_DIR = __dirname;
-const REPORTS_DIR = runner.REPORTS_DIR;
+// APP_DIR = the Understudy install (app/, src/, assets/).
+// Project folders (Flows, TestData, Reports ...) always come from lib/paths.js.
+const APP_DIR = P.APP_DIR;
+const argProject = (() => { const i = process.argv.indexOf("--project"); return i > 0 ? process.argv[i + 1] : process.env.UNDERSTUDY_PROJECT; })();
 
 let CONFIG = {};
-try { CONFIG = JSON.parse(fs.readFileSync(path.join(PROJECT_DIR, "app.config.json"), "utf8")); } catch (_) {}
+try { CONFIG = JSON.parse(fs.readFileSync(path.join(APP_DIR, "app.config.json"), "utf8")); } catch (_) {}
 
 security.configure({ port: PORT, hostNames: [HOST_NAME] });
 
@@ -84,18 +106,22 @@ function fail(res, e) {
 
 const STATIC_TYPES = {
   ".css": "text/css; charset=utf-8", ".js": "application/javascript; charset=utf-8",
-  ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon",
+  ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon", ".gif": "image/gif",
+  ".webp": "image/webp", ".woff2": "font/woff2",
   ".json": "application/json; charset=utf-8", ".webmanifest": "application/manifest+json"
 };
 function sendStatic(res, file) {
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404, security.headers.plain("text/plain")); return res.end("Not found"); }
-    res.writeHead(200, security.headers.app(STATIC_TYPES[path.extname(file).toLowerCase()] || "application/octet-stream"));
+    const h = security.headers.app(STATIC_TYPES[path.extname(file).toLowerCase()] || "application/octet-stream");
+    // Code is re-checked every start (no-cache); images and fonts are cached
+    h["Cache-Control"] = /\.(woff2|png|ico|gif|webp)$/i.test(file) ? "max-age=604800" : "no-cache";
+    res.writeHead(200, h);
     res.end(data);
   });
 }
 function sendIndex(res) {
-  fs.readFile(path.join(PROJECT_DIR, "index.html"), "utf8", (err, html) => {
+  fs.readFile(path.join(APP_DIR, "app", "index.html"), "utf8", (err, html) => {
     if (err) { res.writeHead(500); return res.end("index.html missing"); }
     const h = security.headers.app("text/html; charset=utf-8");
     h["Set-Cookie"] = security.sessionCookie();
@@ -111,8 +137,12 @@ function shutdown(reason) {
   console.log("Stopping Understudy (" + reason + ")");
   try { if (state.currentChild) runner.killTree(state.currentChild); } catch (_) {}
   server.close();
-  setTimeout(() => process.exit(0), 300).unref();
+  // Give the phones their animations back (at most 5 s), then leave
+  const bye = setTimeout(() => process.exit(0), 5000); bye.unref();
+  animations.restoreAll().catch(() => {}).then(() => setTimeout(() => process.exit(0), 300).unref());
 }
+// Console mode: Ctrl+C or closing the console window still restores the phones' animations
+if (!HIDDEN) ["SIGINT", "SIGHUP", "SIGBREAK"].forEach(sig => { try { process.on(sig, () => shutdown(sig)); } catch (_) {} });
 if (HIDDEN) {
   setInterval(() => {
     if (sseCount > 0 || state.busy) { lastActivity = Date.now(); return; }
@@ -133,8 +163,29 @@ const POST = (p, fn) => { routes["POST " + p] = fn; };
 /* Project */
 GET("/api/project", (req, res) => {
   res.writeHead(200, security.headers.api("text/plain; charset=utf-8"));
-  res.end(PROJECT_DIR);
+  res.end(P.root);
 });
+
+/* Projects: install once, many projects */
+GET("/api/projects", (req, res) => json(res, 200, projects.list()));
+function projectChange(fn) {
+  return async (req, res) => {
+    if (state.busy) return json(res, 409, { error: "A run is in progress. Stop it before switching projects." });
+    const b = await security.readJson(req);
+    const before = P.root;
+    const r = await fn(b);
+    if (P.root !== before) {
+      capture.stopAll();
+      try { prepare.prepareData(() => {}); } catch (_) {}
+    }
+    json(res, 200, Object.assign({ ok: true, root: P.root }, r && typeof r === "object" ? { project: r } : {}));
+  };
+}
+POST("/api/projects/open",   projectChange(b => projects.open(b.path)));
+POST("/api/projects/create", projectChange(b => projects.create(b.name, b.folder, b.examples !== false)));
+POST("/api/projects/add",    projectChange(b => projects.addExisting(b.folder, b.name)));
+POST("/api/projects/rename", projectChange(b => projects.rename(b.path, b.name)));
+POST("/api/projects/forget", projectChange(b => projects.forget(b.path)));
 GET("/api/session", (req, res) => json(res, 200, { ok: true, version: CONFIG.version || "", hidden: HIDDEN }));
 POST("/api/shutdown", (req, res) => {
   if (state.busy) return json(res, 409, { error: "A run is in progress. Stop it first." });
@@ -157,10 +208,22 @@ POST("/api/suites/delete", async (req, res) => {
 
 /* History, data preview */
 GET("/api/history", (req, res) => json(res, 200, history.list()));
+GET("/api/history/run", (req, res, u) => {
+  const r = history.get(u.searchParams.get("id"));
+  if (!r) return json(res, 404, { error: "Run not found" });
+  json(res, 200, r);
+});
+// Standalone report for any run in the history (older runs had none)
+POST("/api/report/write", async (req, res) => {
+  const b = await security.readJson(req);
+  const r = history.get(b.id);
+  if (!r) return json(res, 404, { error: "Run not found" });
+  json(res, 200, { ok: true, name: report.write(r) });
+});
 GET("/api/data", (req, res, u) => {
   const ex = String(u.searchParams.get("excel") || ""), sh = String(u.searchParams.get("sheet") || "");
   if (!/^[\w-]+$/.test(ex) || !/^[\w-]+$/.test(sh)) return json(res, 400, { error: "bad name" });
-  fs.readFile(path.join(PROJECT_DIR, "JsonData", ex, sh + ".json"), "utf8", (err, txt) => {
+  fs.readFile(path.join(P.jsonData, ex, sh + ".json"), "utf8", (err, txt) => {
     if (err) return json(res, 404, { error: "No data yet. Run Prepare Data." });
     res.writeHead(200, security.headers.api());
     res.end(txt);
@@ -199,13 +262,19 @@ POST("/api/run", async (req, res) => {
   let items = Array.isArray(parsed.items) ? parsed.items
             : (parsed.flows || []).map(f => ({ flow: f, rows: "" }));
   items = items.filter(it => it && valid.has(it.flow))
-               .map(it => ({ flow: it.flow, rows: String(it.rows || "").slice(0, 200) }));
+               .map(it => ({ flow: it.flow, rows: String(it.rows || "").slice(0, 200),
+                             fromStep: it.fromStep ? parseInt(it.fromStep, 10) || null : null }));
   const unsafe = items.filter(it => !FLOW_SAFE.test(it.flow) || it.flow.includes(".."));
   if (unsafe.length) return json(res, 400, { ok: false,
     error: "Rename these flows (use letters, numbers, spaces, - _ .): " + unsafe.map(i => i.flow).join(", ") });
   if (!items.length) return json(res, 400, { ok: false, error: "no valid flows" });
-  const jobs = runner.buildJobs(items);              // validates row selections
-  const meta = { suite: parsed.suite ? String(parsed.suite).slice(0, 60) : null };
+  let device = android.SERIAL_RE.test(String(parsed.device || "")) ? String(parsed.device) : null;
+  if (device) {                                          // only if it is really connected now
+    const list = await android.devices().catch(() => []);
+    if (!list.some(d => d.serial === device && d.state === "device")) device = null;
+  }
+  const jobs = runner.buildJobs(items, device);      // validates row selections
+  const meta = { suite: parsed.suite ? String(parsed.suite).slice(0, 60) : null, device };
   if (state.busy) return json(res, 409, { ok: false, error: "busy" });
   state.busy = true;
   state.stopRequested = false;
@@ -223,6 +292,7 @@ POST("/api/stop", (req, res) => {
 });
 
 /* Flow file I/O */
+GET("/api/flow/commands", (req, res, u) => json(res, 200, { steps: partial.commands(u.searchParams.get("path")) }));
 GET("/api/flow/read", (req, res, u) => {
   const rel = u.searchParams.get("path");
   json(res, 200, { path: rel, content: flowIo.readFlow(rel) });
@@ -243,15 +313,14 @@ POST("/api/flow/rename",    flowWrite(b => flowIo.renameFlow(b.from, b.to)));
 POST("/api/open-folder", async (req, res) => {
   const b = await security.readJson(req);
   const map = {
-    reports: path.join(PROJECT_DIR, "Reports"), testdata: path.join(PROJECT_DIR, "TestData"),
-    backups: path.join(PROJECT_DIR, "ExcelBackups"), flowbackups: path.join(PROJECT_DIR, "FlowBackups"),
-    flows: path.join(PROJECT_DIR, "Flows"), apps: APPS_DIR, logs: path.join(PROJECT_DIR, "logs"),
-    project: PROJECT_DIR
+    reports: P.reports, testdata: P.testData, backups: P.excelBackups, flowbackups: P.flowBackups,
+    flows: P.flows, apps: P.apps, logs: P.LOG_DIR, project: P.root, install: APP_DIR
   };
   const target = map[String(b.kind || "")];
   if (!target) return json(res, 400, { error: "Unknown folder" });
   fs.mkdirSync(target, { recursive: true });
   if (process.platform === "win32") execFile("explorer.exe", [target], () => {});
+  else execFile(process.platform === "darwin" ? "open" : "xdg-open", [target], () => {});
   json(res, 200, { ok: true, path: target });
 });
 
@@ -285,7 +354,7 @@ POST("/api/excel/newfile", async (req, res) => {
   state.busy = true;
   try { await excel.createExcel(target.dir, target.full, sheet, excel.parseHeaders(parsed.headers)); }
   finally { state.busy = false; }
-  json(res, 200, { ok: true, path: path.relative(PROJECT_DIR, target.full).split(path.sep).join("/") });
+  json(res, 200, { ok: true, path: P.rel(target.full) });
 });
 POST("/api/excel/newsheet", async (req, res) => {
   if (state.busy) return json(res, 409, { error: "Another task is running. Wait for it to finish." });
@@ -302,25 +371,94 @@ GET("/api/doctor", async (req, res) => json(res, 200, { checks: await doctor.che
 
 /* ----- Devices ----- */
 GET("/api/device/list", async (req, res) => {
-  const [devices, avds] = await Promise.all([android.devices().catch(() => []), android.avds()]);
+  let adbError = "";
+  const [devices, avds] = await Promise.all([android.devices().catch(e => { adbError = e.message; return []; }), android.avds()]);
   const problems = {};
   avds.forEach(a => { const p = android.avdProblem(a); if (p) problems[a] = p; });
-  json(res, 200, { devices, avds, problems });
+  json(res, 200, { devices, avds, problems, adb: adbError ? { ok: false, error: adbError } : { ok: true, source: android.adbSource() } });
 });
 POST("/api/device/start", async (req, res) => {
   const b = await security.readJson(req);
-  json(res, 200, android.startAvd(b.avd, { headless: b.headless !== false, graphics: b.graphics, cold: !!b.cold }));
+  json(res, 200, android.startAvd(b.avd, { headless: b.headless !== false, graphics: b.graphics, cold: !!b.cold, light: !!b.light }));
 });
 POST("/api/device/stop", async (req, res) => {
   const b = await security.readJson(req);
   capture.stop(String(b.serial || ""));
+  await animations.restore(String(b.serial || "")).catch(() => {});
   json(res, 200, await android.stopDevice(b.serial));
 });
 POST("/api/device/connect", async (req, res) => {
   const b = await security.readJson(req);
-  if (b.code) await android.pair(String(b.pairAddress || ""), String(b.code));
-  json(res, 200, await android.connect(String(b.address || "")));
+  let address = String(b.address || "").trim();
+  if (b.code) {
+    const p = await android.pair(String(b.pairAddress || ""), String(b.code));
+    // Paired: the phone usually announces its connection address, so the tester need not type it
+    if (!address) {
+      const f = await pairing.findConnect(p.ip, 7000);
+      if (f && f.already) return json(res, 200, { ok: true, address: f.serial, paired: true });
+      if (f && f.address) address = f.address;
+      else return json(res, 400, { error: "Paired. Now enter the \u201CIP address & Port\u201D shown at the top of Wireless debugging (not the pairing port) and press Connect.", paired: true });
+    }
+  }
+  const r = await android.connect(address);
+  json(res, 200, Object.assign({ paired: !!b.code }, r));
 });
+/* Can this PC reach a phone at IP:port? Plain-language answer (lib/wifi.js) */
+POST("/api/device/wifi-check", async (req, res) => {
+  const b = await security.readJson(req);
+  const address = android.normAddr(b.address);
+  json(res, 200, Object.assign(await wifi.diagnose(address, b.what === "pair" ? "pair" : "connect"), { address, networks: wifi.pcNetworks() }));
+});
+/* Phone animations off while recording (more reliable element capture), restored on disconnect / quit */
+POST("/api/device/animations", async (req, res) => {
+  const b = await security.readJson(req);
+  const serial = String(b.serial || "");
+  android.checkSerial(serial);
+  json(res, 200, b.off === false ? await animations.restore(serial) : await animations.off(serial));
+});
+POST("/api/device/wifi", async (req, res) => {
+  const b = await security.readJson(req);
+  json(res, 200, await android.usbToWifi(String(b.serial || "")));
+});
+/* Phone tools (adb) installed into Understudy's own folder */
+GET("/api/adb/status", (req, res) => json(res, 200, Object.assign(adbSetup.status(), { source: android.adbSource() })));
+POST("/api/adb/install", (req, res) => json(res, 200, adbSetup.install()));
+/* Wi-Fi pairing by QR code */
+POST("/api/pair/start", (req, res) => json(res, 200, pairing.start({
+  canRestart: () => !state.busy,                       // restarting adb would cut a running test
+  beforeRestart: () => { try { capture.stopAll(); } catch (_) {} }
+})));
+GET("/api/pair/status", (req, res) => json(res, 200, pairing.status()));
+POST("/api/pair/stop", (req, res) => json(res, 200, pairing.stop()));
+GET("/api/device/apps", async (req, res, u) => json(res, 200, { apps: await android.apps(u.searchParams.get("serial")) }));
+GET("/api/device/foreground", async (req, res, u) => json(res, 200, { app: await android.foreground(u.searchParams.get("serial")) }));
+POST("/api/device/openlink", async (req, res) => {
+  deviceFree();
+  const b = await security.readJson(req);
+  json(res, 200, await android.openLink(String(b.serial || ""), String(b.url || "")));
+});
+// Every element on screen (for hover outlines). Cached unless force=1.
+GET("/api/device/layout", async (req, res, u) => {
+  const serial = String(u.searchParams.get("serial") || "");
+  android.checkSerial(serial);
+  if (u.searchParams.get("force") === "1" && !state.busy) {
+    const l = await android.layout(serial);
+    return json(res, 200, { seq: l.seq, screenSeq: android.screenInfo(serial).seq, nodes: recorder.compactNodes(l.nodes) });
+  }
+  const info = android.screenInfo(serial);
+  const snap = android.lastLayout(serial);
+  if (!snap) return json(res, 200, { seq: 0, screenSeq: info.seq, nodes: [] });
+  json(res, 200, { seq: snap.seq, screenSeq: info.seq, nodes: recorder.compactNodes(snap.nodes) });
+});
+/* Heavy Android processes on this PC (emulator, adb, Android Studio) */
+GET("/api/system/processes", async (req, res) => json(res, 200, { groups: await android.processes() }));
+POST("/api/system/free", async (req, res) => {
+  if (state.busy) return json(res, 409, { error: "A run is using the device. Stop it first." });
+  const b = await security.readJson(req);
+  capture.stopAll();
+  json(res, 200, await android.endProcesses(b.kinds));
+});
+
 POST("/api/device/snapshot", async (req, res) => {
   deviceFree();
   const b = await security.readJson(req);
@@ -366,14 +504,14 @@ function apkName(n) {
   return base;
 }
 function apkFile(n) {
-  const full = path.resolve(APPS_DIR, apkName(n));
-  if (!full.startsWith(APPS_DIR + path.sep) || !fs.existsSync(full)) throw new Error("APK not found");
+  const full = path.resolve(P.apps, apkName(n));
+  if (!full.startsWith(P.apps + path.sep) || !fs.existsSync(full)) throw new Error("APK not found");
   return full;
 }
 GET("/api/apk/list", (req, res) => {
-  fs.mkdirSync(APPS_DIR, { recursive: true });
-  const list = fs.readdirSync(APPS_DIR).filter(f => /\.apk$/i.test(f)).map(f => {
-    const st = fs.statSync(path.join(APPS_DIR, f));
+  fs.mkdirSync(P.apps, { recursive: true });
+  const list = fs.readdirSync(P.apps).filter(f => /\.apk$/i.test(f)).map(f => {
+    const st = fs.statSync(path.join(P.apps, f));
     return { name: f, size: st.size, mtime: st.mtimeMs };
   }).sort((a, b) => b.mtime - a.mtime);
   json(res, 200, { apks: list });
@@ -384,8 +522,8 @@ POST("/api/apk/upload", (req, res, u) => new Promise((resolve, reject) => {
     const e = new Error("Expected a file"); e.status = 415; throw e;
   }
   if (Number(req.headers["content-length"] || 0) > APK_LIMIT) { const e = new Error("APK is larger than 800 MB"); e.status = 413; throw e; }
-  fs.mkdirSync(APPS_DIR, { recursive: true });
-  const final = path.join(APPS_DIR, name), part = final + ".part";
+  fs.mkdirSync(P.apps, { recursive: true });
+  const final = path.join(P.apps, name), part = final + ".part";
   const out = fs.createWriteStream(part);
   let size = 0, head = null, aborted = false;
   const abort = (msg, status) => {
@@ -421,10 +559,10 @@ POST("/api/apk/delete", async (req, res) => {
 /* Android SDK setup without Android Studio (opens a visible PowerShell window) */
 POST("/api/setup/android", (req, res) => {
   if (process.platform !== "win32") return json(res, 400, { error: "This installer is for Windows" });
-  const script = path.join(PROJECT_DIR, "tools", "install-android.ps1");
+  const script = path.join(APP_DIR, "tools", "install-android.ps1");
   if (!fs.existsSync(script)) return json(res, 404, { error: "tools/install-android.ps1 is missing" });
   execFile("cmd.exe", ["/c", "start", "Understudy - Android setup", "powershell.exe",
-    "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script], { windowsHide: false, cwd: PROJECT_DIR }, () => {});
+    "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script], { windowsHide: false, cwd: APP_DIR }, () => {});
   json(res, 200, { ok: true });
 });
 
@@ -433,7 +571,18 @@ POST("/api/rec/inspect", async (req, res) => {
   deviceFree();
   const b = await security.readJson(req);
   const t0 = Date.now();
-  const l = await android.layout(b.serial);
+  let l;
+  try { l = await android.layout(b.serial, b.seq); }
+  catch (e) {
+    // The layout can't be read (moving screen, slow phone): still record the step with
+    // the screen position and say why, instead of losing the tap.
+    if (/busy|Killed/.test(e.message)) throw e;
+    const size = android.screenInfo(String(b.serial)).size || await android.screenSize(String(b.serial)).catch(() => null);
+    if (!size) throw e;
+    const r = recorder.pointOnly(Number(b.x), Number(b.y), size, e.message);
+    r.ms = Date.now() - t0;
+    return json(res, 200, r);
+  }
   const r = recorder.inspect(l.nodes, Number(b.x), Number(b.y));
   r.cached = l.cached; r.ms = Date.now() - t0;
   json(res, 200, r);
@@ -462,7 +611,7 @@ POST("/api/rec/save", async (req, res) => {
 POST("/api/capture/start", async (req, res) => {
   deviceFree();
   const b = await security.readJson(req);
-  json(res, 200, await capture.start(String(b.serial || ""), String(b.appId || "")));
+  json(res, 200, await capture.start(String(b.serial || ""), String(b.appId || ""), { follow: !!b.follow }));
 });
 POST("/api/capture/stop", async (req, res) => {
   const b = await security.readJson(req);
@@ -470,9 +619,27 @@ POST("/api/capture/stop", async (req, res) => {
 });
 GET("/api/capture/poll", (req, res, u) => json(res, 200, capture.poll(String(u.searchParams.get("serial") || ""))));
 
+/* ----- Optional AI helper (Ollama, local) ----- */
+GET("/api/ai/status", async (req, res) => json(res, 200, await ai.status()));
+POST("/api/ai/install", async (req, res) => json(res, 200, ai.install()));
+POST("/api/ai/pull", async (req, res) => { const b = await security.readJson(req); json(res, 200, await ai.pull(String(b.model || ""))); });
+POST("/api/ai/remove", async (req, res) => { const b = await security.readJson(req); json(res, 200, await ai.remove(String(b.model || ""))); });
+POST("/api/ai/enable", async (req, res) => { const b = await security.readJson(req); json(res, 200, ai.setEnabled(!!b.on)); });
+POST("/api/ai/generate", async (req, res) => {
+  const b = await security.readJson(req);
+  const serial = String(b.serial || "");
+  const devs = await android.devices().catch(() => []);
+  const d = devs.find(x => x.serial === serial && x.state === "device");
+  if (!d || d.emulator || d.wifi) return json(res, 400, { error: "The AI helper works with a phone connected by USB. Plug in a phone and choose it." });
+  let nodes = null;
+  try { nodes = (await android.layout(serial)).nodes; } catch (_) {}
+  json(res, 200, await ai.generate({ yaml: String(b.yaml || "").slice(0, 40000), prompt: String(b.prompt || ""), appId: String(b.appId || ""), nodes }));
+});
+
 /* ---------- Files behind the session (reports, failure screenshots) ---------- */
 function serveReport(req, res, p) {
   const rel = decodeURIComponent(p.slice("/reports/".length));
+  const REPORTS_DIR = P.reports;
   const filePath = path.resolve(REPORTS_DIR, rel);
   if (!filePath.startsWith(REPORTS_DIR + path.sep)) { res.writeHead(403); return res.end(); }
   fs.readFile(filePath, (err, data) => {
@@ -485,8 +652,8 @@ function serveReport(req, res, p) {
 }
 function serveRunShot(req, res, p) {
   const rel = p.slice("/runs/".length).split("/").map(decodeURIComponent).join(path.sep);
-  const filePath = path.resolve(runner.RUNS_DIR, rel);
-  if (!filePath.startsWith(runner.RUNS_DIR + path.sep) || !/\.png$/i.test(filePath)) { res.writeHead(403); return res.end(); }
+  const filePath = path.resolve(P.runs, rel);
+  if (!filePath.startsWith(P.runs + path.sep) || !/\.png$/i.test(filePath)) { res.writeHead(403); return res.end(); }
   fs.readFile(filePath, (err, data) => {
     if (err) { res.writeHead(404); return res.end("Not found"); }
     res.writeHead(200, security.headers.api("image/png"));
@@ -505,11 +672,12 @@ const server = http.createServer(async (req, res) => {
   // 2. Public static files (no data in them)
   if (req.method === "GET") {
     if (p === "/" || p === "/index.html") return sendIndex(res);
-    if (p === "/styles.css" || p === "/app.js" || p === "/app.config.json" || p === "/manifest.webmanifest")
-      return sendStatic(res, path.join(PROJECT_DIR, p.slice(1)));
-    if (/^\/ui\/[a-z0-9-]+\.js$/.test(p)) return sendStatic(res, path.join(PROJECT_DIR, p));
-    if (/^\/assets\/[a-z0-9-]+\.(svg|png|ico)$/.test(p)) return sendStatic(res, path.join(PROJECT_DIR, p));
-    if (p === "/favicon.ico") return sendStatic(res, path.join(PROJECT_DIR, "assets", "understudy.ico"));
+    if (p === "/styles.css" || p === "/app.js") return sendStatic(res, path.join(APP_DIR, "app", p.slice(1)));
+    if (p === "/app.config.json" || p === "/manifest.webmanifest") return sendStatic(res, path.join(APP_DIR, p.slice(1)));
+    if (/^\/src\/[a-z]+\/[a-z0-9-]+\.ui\.js$/.test(p)) return sendStatic(res, path.join(APP_DIR, p));
+    if (/^\/assets\/[a-z0-9-]+\.(svg|png|ico|gif|webp)$/.test(p)) return sendStatic(res, path.join(APP_DIR, p));
+    if (/^\/assets\/fonts\/[a-z0-9-]+\.woff2$/.test(p)) return sendStatic(res, path.join(APP_DIR, p));
+    if (p === "/favicon.ico") return sendStatic(res, path.join(APP_DIR, "assets", "understudy.ico"));
   }
 
   const isApi = p.startsWith("/api/"), isFile = p.startsWith("/reports/") || p.startsWith("/runs/");
@@ -552,7 +720,7 @@ server.on("error", e => {
 // Hidden mode has no console: keep a log file (only the instance that owns the port writes it)
 function startLogFile() {
   try {
-    const dir = path.join(PROJECT_DIR, "logs");
+    const dir = P.LOG_DIR;
     fs.mkdirSync(dir, { recursive: true });
     const out = fs.createWriteStream(path.join(dir, "understudy.log"), { flags: "w" });
     const write = (...a) => out.write(new Date().toISOString() + "  " + a.map(String).join(" ") + "\n");
@@ -561,10 +729,14 @@ function startLogFile() {
   } catch (_) {}
 }
 
+// Open the last project (or --project <folder>) before anything reads project files
+try { projects.init(argProject); } catch (e) { console.log(" Project     : " + e.message); }
+
 server.listen(PORT, "127.0.0.1", () => {
   if (HIDDEN) startLogFile();
+  console.log(" Project     : " + P.root);
   try {
-    const r = require("./lib/prepare").prepareData(() => {});
+    const r = require("./src/data/prepare").prepareData(() => {});
     console.log(" Test data   : " + r.files + " Excel file(s), " + r.sheets + " sheet(s) prepared");
   } catch (e) { console.log(" Test data   : could not prepare (" + e.message + ")"); }
   console.log("");
@@ -574,6 +746,9 @@ server.listen(PORT, "127.0.0.1", () => {
   console.log("=================================================");
   console.log(" Excel library: " + (excel.excelLib() || "NOT FOUND (run: npm install)"));
   console.log(HIDDEN ? " Running in the background. Use Quit in the app to stop." : " Press Ctrl+C to stop.");
+  if (process.env.NODE_EXTRA_CA_CERTS) console.log(" Certificates: extra company certificates loaded (" + path.basename(process.env.NODE_EXTRA_CA_CERTS) + ")");
+  // Phones left without animations by a previous session that didn't quit cleanly
+  animations.restoreAll().then(r => { if (r.restored.length) console.log(" Animations  : restored on " + r.restored.join(", ")); }).catch(() => {});
   console.log("");
   if (!NO_OPEN) appWin.open(URL_MAIN, CONFIG.window);
 });

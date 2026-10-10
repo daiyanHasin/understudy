@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Understudy · Record, data-drive and run Maestro mobile tests</title>
 <meta name="description" content="Understudy records Android UI tests on a virtual device, turns typed values into Excel test data in one click, and runs them with Maestro. 100% local. No Maestro Studio, no Android Studio.">
-<meta name="theme-color" content="#0b0c0f">
+<meta name="theme-color" content="#111316">
 <meta property="og:title" content="Understudy · Show it once. It performs a thousand times.">
 <meta property="og:description" content="Record mobile tests on a virtual device, make them data-driven with Excel, run them with Maestro. 100% local.">
 <meta property="og:image" content="/assets/img/og.png">
@@ -13,8 +13,8 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/assets/logo.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/assets/icon-192.png">
-<link rel="preload" href="/assets/fonts/instrument-serif-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="/assets/fonts/inter-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/fonts/source-serif-4-latin-500-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/fonts/hanken-grotesk-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/site.css">
 <script>try{var t=localStorage.getItem("us-site-theme");if(t)document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
 </head>
@@ -43,9 +43,9 @@
 <main id="main">
   <section class="hero">
     <div class="wrap">
-      <span class="eyebrow"><b>v1.1</b> For Maestro · Android · Windows</span>
+      <span class="eyebrow"><b>v1.2</b> For Maestro · Android · Windows</span>
       <h1>Show it once.<br>It performs <em>a&nbsp;thousand&nbsp;times.</em></h1>
-      <p class="lead">Understudy records Android UI tests on a virtual device, turns every typed value into Excel test data with one click, and runs them with Maestro. All on your own PC.</p>
+      <p class="lead">Understudy records Android UI tests on your phone or a virtual device, turns every typed value into Excel test data with one click, and runs them with Maestro. All on your own PC.</p>
       <div class="ctas">
         <a class="btn spot lg" href="/docs#install">Get started — it's free</a>
         <a class="btn ghost lg" data-gh href="#">View on GitHub</a>
@@ -61,7 +61,7 @@
 
   <div class="facts">
     <div class="wrap">
-      <div class="fact"><b>0</b><span>phones to plug in. Record on a virtual device.</span></div>
+      <div class="fact"><b>One click</b><span>on any element opens every action: tap, type, check, wait, scroll, copy.</span></div>
       <div class="fact"><b>1 click</b><span>from typed value to Excel column.</span></div>
       <div class="fact"><b>100%</b><span>local. Runs on 127.0.0.1 only.</span></div>
       <div class="fact"><b>Free</b><span>No Maestro Studio. No Android Studio.</span></div>
@@ -72,15 +72,16 @@
     <div class="wrap">
       <div class="kicker">01 — RECORD</div>
       <h2 class="title reveal">Record on a virtual device. Or on the phone in your hand.</h2>
-      <p class="sub reveal">Start a light Android emulator from Understudy, plug in a phone, or connect one over Wi-Fi. Click on the screen inside Understudy, or switch to <em>From device</em> and just use the app.</p>
+      <p class="sub reveal">Plug in a phone, connect it over Wi-Fi by QR code or 6-digit code, or start a light Android emulator. Click an element inside Understudy and choose what to do with it, or switch to <em>From phone</em> and just use the app.</p>
       <div class="split">
         <div class="copy reveal">
           <h3>Every action becomes a step</h3>
           <p>Taps, long presses, swipes, typing and checks turn into readable Maestro steps with the best target already picked.</p>
           <ul class="ticks">
-            <li>Targets by ID, text, label and placeholders like “Enter email”</li>
+            <li>Targets by ID, text, label and placeholders like “Enter email”, plus ID&nbsp;+&nbsp;text and index for lists</li>
+            <li>Hover inspector shows every element's selectors, counted the way Maestro counts them</li>
             <li><em>From device</em> keeps only touches in your app</li>
-            <li>Add, install and remove APKs right next to the app ID</li>
+            <li>Pick any installed app, or add and install an APK</li>
             <li>Clean-state snapshots for repeatable runs</li>
           </ul>
         </div>
@@ -105,7 +106,7 @@
             <li>Run rows <span class="mono">1</span>, <span class="mono">all</span>, <span class="mono">2-5</span> or <span class="mono">1,4-6,10</span></li>
           </ul>
         </div>
-        <figure class="shot reveal flat"><img src="/assets/img/value-dialog.webp" width="2000" height="1250" alt="Dialog to choose fixed text or test data with Excel file, sheet and column" loading="lazy"></figure>
+        <figure class="shot reveal flat"><img src="/assets/img/value-dialog.webp" width="2000" height="1250" alt="Typing into a field from the element menu, with the value going to an Excel column" loading="lazy"></figure>
       </div>
     </div>
   </section>
@@ -122,6 +123,7 @@
           <ul class="ticks">
             <li>Two-way flow editor with any Maestro command</li>
             <li>Tick steps and wrap them in a block</li>
+            <li>Variables, copy text into a variable, if / else on any condition</li>
             <li>Non-unique targets flagged before they bite</li>
           </ul>
         </div>
@@ -160,7 +162,8 @@
           <h3>From live steps to trends</h3>
           <ul class="ticks">
             <li>Live step list with timings and the Excel row in use</li>
-            <li>Failure screenshot and an HTML report per test</li>
+            <li>Reports tab: steps, timings, Excel row, failure screenshot, run from the failed step</li>
+            <li>One offline HTML report per run</li>
             <li>Pass-rate trend, slowest and flaky tests</li>
             <li>Compare two runs: fixed, newly failing, still failing</li>
           </ul>
@@ -169,12 +172,12 @@
       </div>
 
       <div class="grid reveal">
-        <div class="cell"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg></div><h4>Virtual, USB or Wi-Fi</h4><p>Light emulator, cable, or wireless debugging with pairing.</p></div>
+        <div class="cell"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg></div><h4>USB, Wi-Fi or virtual</h4><p>QR code or 6-digit pairing, USB → Wi-Fi, and a connection check that says what blocks it.</p></div>
         <div class="cell"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"/></svg></div><h4>No Android Studio</h4><p>One button installs adb, the emulator and a light virtual device.</p></div>
         <div class="cell"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 10h16M10 10v9"/></svg></div><h4>Excel editor inside</h4><p>Edit cells, rows, columns and sheets with backups before every save.</p></div>
         <div class="cell"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h7"/><circle cx="18" cy="16" r="3"/></svg></div><h4>Suites and tags</h4><p>Save a queue with its order and rows. One click on a tag queues every match.</p></div>
-        <div class="cell"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5v14"/><circle cx="12" cy="12" r="9"/></svg></div><h4>Clean state</h4><p>Snapshot a virtual device and return to it before every session.</p></div>
-        <div class="cell"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4z"/></svg></div><h4>Bengali and beyond</h4><p>Non-English typing through the free ADB Keyboard app.</p></div>
+        <div class="cell"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5v14"/><circle cx="12" cy="12" r="9"/></svg></div><h4>Projects</h4><p>Install once, keep many projects anywhere on the PC, switch from the sidebar.</p></div>
+        <div class="cell"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4z"/></svg></div><h4>Bengali and beyond</h4><p>Any language is typed through the device clipboard. Nothing extra to install.</p></div>
       </div>
     </div>
   </section>
@@ -184,8 +187,8 @@
       <div class="kicker">HOW IT WORKS</div>
       <h2 class="title reveal">Three steps from APK to a passing suite.</h2>
       <div class="steps3">
-        <div class="step3 reveal"><h4>Set up once</h4><p>Install Node.js, Java and the Maestro CLI. Double-click <span class="mono">Understudy.vbs</span>; Setup installs the Android tools and tells you what's missing.</p></div>
-        <div class="step3 reveal"><h4>Record</h4><p>Add your APK, launch the app, and click through the flow. Choose fixed text or test data for every value you type.</p></div>
+        <div class="step3 reveal"><h4>Set up once</h4><p>Install Node.js, Java and the Maestro CLI. Double-click <span class="mono">Understudy.vbs</span> (works behind company HTTPS inspection too); Setup tells you what's missing.</p></div>
+        <div class="step3 reveal"><h4>Record</h4><p>Connect a phone, pick the app, and click through the flow. Choose fixed text or test data for every value you type.</p></div>
         <div class="step3 reveal"><h4>Run and repeat</h4><p>Pick flows and rows, run, and read the live steps, reports and dashboard. Add rows to Excel to test more cases.</p></div>
       </div>
     </div>

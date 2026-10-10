@@ -32,3 +32,12 @@ Desktop.ini
 *.swp
 *.tmp
 npm-debug.log*
+node_modules
+
+# ---- Phone tools downloaded by Understudy (Setup > Install phone tools) ----
+tools/platform-tools/
+tools/.staging/
+tools/*.part
+
+# ---- Company certificates gathered on this PC (tools/install-deps.ps1) ----
+tools/certs/

@@ -1,5 +1,66 @@
 # Changelog
 
+## Understudy 2.0.0 — 2026-10-10
+
+### Recording
+- One click on an element opens a menu beside it: Tap, Long press, Double tap, Type text, Clear text, Check it is visible, Wait until it shows, Scroll until it shows, Copy its text, Inspect, or Tap without recording. Each has a one-letter shortcut; Esc closes.
+- Choose how the element is found (ID, text, ID + text, position) in the same menu, marked unique or not.
+- Typing is one step: type, pick This exact text or From Excel (column suggested), press Enter. The tap and the text are recorded together. Excel values go to `TestData/<App>Data.xlsx` on a sheet named after the flow unless you change it.
+- Modes reduced to Record, Use phone and From phone. Add check, Copy text and Inspect are now actions in the menu.
+
+### Screen
+- Live video (scrcpy) removed: nothing is copied to the phone any more.
+- Screenshots are compressed on the phone (`screencap | gzip -1`) and fetched back to back. Phones without gzip fall back to raw screenshots automatically. Frame rate shown above the screen.
+
+### Design
+- New look: porcelain and ink with a brass accent, light paper sidebar, dark dot-grid stage, Source Serif 4 and Hanken Grotesk (bundled, offline). Light and dark.
+- New logo and icons.
+
+### Code
+- Sorted by feature: `src/<feature>/x.js` (PC) next to `x.ui.js` (window); the window shell in `app/`. The old `app.js` is split into run, Excel and flow-editor files.
+- Removed: `lib/mirror.js`, `ui/mirror.js`, `vendor/scrcpy-server`, `docs/CODEMAP.md` (the README has the folder map), the duplicate `docs/CHANGELOG.md`, the old demo GIF, Inter and Instrument Serif.
+
+## Understudy 1.2.0 — 2026-10-06
+
+### Devices: the core rewritten for speed and reliability
+- **Live screen (scrcpy).** The device is shown as H.264 video decoded in the window instead of a 10 MB raw screenshot per frame. Smooth over USB, and finally usable over Wi-Fi. Falls back to screenshots automatically.
+- **Real touches.** The finger goes down when the mouse goes down and up when it goes up: buttons show their pressed state, long presses and drags behave like a thumb.
+- **Typing any language** (Bengali included) goes through the device clipboard. No ADB Keyboard needed with the live screen.
+- **"Killed" fixed.** Only one screen read runs per device at a time; if Maestro Studio or a leftover Maestro driver holds the device, Understudy releases it and retries.
+- **All elements.** Screen reads include dialogs, the keyboard and system bars (`uiautomator dump --windows` on Android versions that have it); taps target the window on top.
+- **Hover inspector** like Maestro Studio: every element is outlined under the mouse with its type, ID and text; "All" outlines everything at once. The Element tab shows every property, including the resource ID.
+- **Recording from the phone** no longer reports "the screen was still changing": the element is read from the screen as it was when the finger touched it. A blinking cursor or the clock no longer count as changes.
+- **Follow other apps** (From device mode): taps in a browser or another app are kept and an "Open app" step is added when the app changes.
+- **Apps on the device**: pick an installed app (including Chrome, Settings ...) instead of uploading an APK.
+- **USB to Wi-Fi in one click**, plus a quality setting for slow Wi-Fi.
+- **Virtual devices:** Stop now really ends the emulator; **Free memory** ends the emulator, adb and (optionally) Android Studio; **Light mode** starts it with 1.5 GB RAM and 2 cores.
+- Runs go to the device chosen on the Record tab (`maestro --device`).
+
+### Recording: many more commands
+- **Variables**: flow variables (`env`), Set variable (text or JavaScript), **Copy text into a variable** (click a text on screen), Type a variable, Paste, Check a condition. Text you copy on the phone can be saved as a variable from the notification.
+- **If / else**, on "visible", "not visible" or any JavaScript condition such as `output.Role == 'admin'`. The else part is driven by a flag, so the if part may change the screen safely.
+- **Apps and web**: switch to another app, open a link or the browser, stop / kill / clear an app, recent apps.
+- Wait until visible (with a timeout), run another flow file, run a JavaScript file, GPS location, airplane mode, screen recording, more keys.
+
+### Running
+- **Run from any step with the data loaded.** Steps before it are skipped, except data scripts and variables, which run first: no more `undefined` when starting at line 12. From Flow files ("Run from step…") or from a failed test in Reports ("Run from the failed step…", which preselects the step).
+
+### Reports
+- New **Reports** tab: every run with a pass-rate ring, totals, each test's steps with timings, the Excel row, the failure reason and the screen at the failure. Rerun failed, run again, run from the failed step.
+- Each run is also saved as one self-contained, offline HTML file: `Reports/Understudy-Run-<date>.html`.
+- Picking a report on the Run tab opens it in the Reports tab. Failure screenshots are kept with the reports (they used to be lost on the next run).
+
+### Projects
+- Install once, keep many projects anywhere on the PC, switch from the top of the sidebar. The list lives in `%APPDATA%\Understudy`, so it survives updates. The install folder stays the "Default project": nothing needs moving.
+
+### Optional AI helper
+- Writes or changes a flow from a sentence, using a small local model through Ollama. Not bundled and never required: installed from Setup in a few clicks, works only with a phone over USB, and reads the real screen to target the right elements.
+
+### Look and speed
+- Opening curtain, collapsible sidebar (Ctrl+B), first-start guide, new logo.
+- Fonts ship with the app: the window no longer waits for Google Fonts on slow or no internet.
+- The Dashboard loads run history without step details (faster).
+
 ## Understudy 1.1.0 — 2026-10-04
 
 ### Recording
