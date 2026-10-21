@@ -29,7 +29,7 @@ module.exports = function register(r, ctx) {
       const r = await fn(b);
       if (P.root !== before) {
         capture.stopAll();
-        try { prepare.prepareData(() => {}); } catch (_) {}
+        prepare.prepareData(() => {}).catch(() => {});
       }
       json(res, 200, Object.assign({ ok: true, root: P.root }, r && typeof r === "object" ? { project: r } : {}));
     };

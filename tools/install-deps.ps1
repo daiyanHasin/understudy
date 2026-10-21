@@ -114,15 +114,20 @@ if ($text -match 'SELF_SIGNED_CERT_IN_CHAIN|UNABLE_TO_GET_ISSUER_CERT|UNABLE_TO_
   Write-Host '  - Ask IT for the root certificate file (.cer, .crt or .pem) of the HTTPS inspection,'
   Write-Host "    copy it into:  $certDir"
   Write-Host '    and open Understudy again. Nothing else needs changing.'
+} elseif ($text -match 'EALLOWREMOTE|Fetching packages of type') {
+  Write-Host '  - npm on this PC refuses packages that are downloaded from a plain web address'
+  Write-Host '    (a newer npm, or a company npm policy). Understudy 2.0.1 no longer needs one:'
+  Write-Host '    make sure package.json and package-lock.json are the 2.0.1 versions, then open'
+  Write-Host '    Understudy again.'
 } elseif ($text -match 'ENOTFOUND|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN|network') {
   Write-Host '  - npm could not reach the internet. If your company uses a proxy, set it once:'
   Write-Host '      npm config set proxy http://<proxy>:<port>'
   Write-Host '      npm config set https-proxy http://<proxy>:<port>'
-  Write-Host '  - The download hosts are registry.npmjs.org and cdn.sheetjs.com. Ask IT to allow them,'
+  Write-Host '  - The download host is registry.npmjs.org. Ask IT to allow it,'
   Write-Host '    or use the offline release ZIP (it already contains node_modules).'
 } elseif ($text -match 'E403|E401|blocked|forbidden') {
-  Write-Host '  - The company network blocked a download (registry.npmjs.org or cdn.sheetjs.com).'
-  Write-Host '    Ask IT to allow both, or use the offline release ZIP (it already contains node_modules).'
+  Write-Host '  - The company network blocked a download (registry.npmjs.org).'
+  Write-Host '    Ask IT to allow it, or use the offline release ZIP (it already contains node_modules).'
 } else {
   Write-Host '  - See the messages above.'
 }

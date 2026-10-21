@@ -89,15 +89,9 @@ function killTree(child) {
 // Prepare Data now runs in-process (src/data/prepare.js). No run-server.bat,
 // no json-server, no port 8080: the data is embedded in Scripts/**/*.js.
 function runSetup() {
-  return new Promise(resolve => {
-    try {
-      const r = prepare.prepareData(broadcast);
-      resolve(r.ok ? 0 : 1);
-    } catch (e) {
-      broadcast("[ERROR] " + e.message + "\n");
-      resolve(1);
-    }
-  });
+  return prepare.prepareData(broadcast)
+    .then(r => (r.ok ? 0 : 1))
+    .catch(e => { broadcast("[ERROR] " + e.message + "\n"); return 1; });
 }
 
 /*

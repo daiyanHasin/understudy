@@ -115,7 +115,7 @@ async function save(recIn, opts) {
   if (fs.existsSync(full) && !opts.overwrite) { const e = new Error("A flow with that name already exists"); e.code = "EXISTS"; throw e; }
   const dataResult = rec.data ? await writeData(rec.data, rec.steps) : { columns: 0 };
   flowIo.saveFlow(rec.flow, yaml);
-  if (rec.data) prepare.prepareData(() => {});
+  if (rec.data) await prepare.prepareData(() => {}).catch(() => {});
   return { ok: true, path: rec.flow, data: dataResult };
 }
 

@@ -19,11 +19,16 @@ If rc <> 0 Then
   WScript.Quit 1
 End If
 
+'    This does NOT install npm or Node.js (those are checked above and must already be
+'    on the PC). It runs `npm install` once, which downloads Understudy's own libraries
+'    (exceljs, yaml) into the node_modules folder next to this file. It only runs when
+'    that folder is missing them: a fresh copy, or a copy whose last install failed.
 ' 2. First start: install components (a window shows progress).
 '    tools\install-deps.ps1 also handles company networks that inspect HTTPS
 '    (Netskope, Zscaler ...): it gives npm the certificates Windows trusts, so
 '    "SELF_SIGNED_CERT_IN_CHAIN" no longer stops the install.
-If Not fso.FolderExists(dir & "\node_modules\exceljs") Or Not fso.FolderExists(dir & "\node_modules\xlsx") Or Not fso.FolderExists(dir & "\node_modules\yaml") Then
+'    2.0.1: `xlsx` is no longer needed (npm on company PCs refused to download it).
+If Not fso.FolderExists(dir & "\node_modules\exceljs") Or Not fso.FolderExists(dir & "\node_modules\yaml") Then
   MsgBox "First start: Understudy will now install its components." & vbCrLf & _
          "This takes about a minute and needs internet.", vbInformation, "Understudy"
   rc = sh.Run(ps, 1, True)

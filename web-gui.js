@@ -164,10 +164,9 @@ try { projects.init(argProject); } catch (e) { console.log(" Project     : " + e
 server.listen(PORT, "127.0.0.1", () => {
   if (HIDDEN) startLogFile();
   console.log(" Project     : " + P.root);
-  try {
-    const r = require("./src/data/prepare").prepareData(() => {});
-    console.log(" Test data   : " + r.files + " Excel file(s), " + r.sheets + " sheet(s) prepared");
-  } catch (e) { console.log(" Test data   : could not prepare (" + e.message + ")"); }
+  require("./src/data/prepare").prepareData(() => {})
+    .then(r => console.log(" Test data   : " + r.files + " Excel file(s), " + r.sheets + " sheet(s) prepared"))
+    .catch(e => console.log(" Test data   : could not prepare (" + e.message + ")"));
   console.log("");
   console.log("=================================================");
   console.log(" Understudy " + (CONFIG.version || "") + ": " + URL_MAIN);

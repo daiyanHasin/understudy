@@ -13,7 +13,9 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 set "US_PS=powershell.exe -NoProfile -ExecutionPolicy Bypass -File "tools\install-deps.ps1""
-if not exist "node_modules\exceljs\" (
+if not exist "node_modules\yaml\" set "US_NEED=1"
+if not exist "node_modules\exceljs\" set "US_NEED=1"
+if defined US_NEED (
     echo First run: installing dependencies...
     %US_PS%
     if errorlevel 1 (
