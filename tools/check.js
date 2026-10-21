@@ -169,6 +169,18 @@ const rel = p => path.relative(ROOT, p).split(path.sep).join("/");
       N({ pkg: "com.sec.android.app.launcher", win: 4, layer: 0, wtype: "TYPE_APPLICATION" })];
     assert.strictEqual(apps.appFromNodes(nodes, "com.sec.android.app.launcher"), "com.shop.app");
     assert.strictEqual(apps.appFromNodes(nodes.filter(n => n.pkg !== "com.shop.app"), "com.sec.android.app.launcher"), "");
+    // A clock widget on the home screen is not "the Clock app in front"
+    assert.strictEqual(apps.appFromNodes([N({ pkg: "com.sec.android.app.launcher", win: 1 }),
+      N({ pkg: "com.sec.android.app.clockpackage", win: 1, y2: 600 })], "com.sec.android.app.launcher"), "");
+  });
+  await test("live video: the decoder is told to show every picture at once (SPS rewrite)", () => {
+    const ui = fs.readFileSync(path.join(ROOT, "src", "record", "recorder.ui.js"), "utf8");
+    const fixSps = new Function(ui.slice(ui.indexOf("// BEGIN fixSps"), ui.indexOf("// END fixSps")) + "; return fixSps;")();
+    const noVui = Uint8Array.from(Buffer.from("674d4020d900b40c99", "hex"));     // main profile, no VUI (like many phones)
+    const fixed = fixSps(noVui);
+    assert.ok(fixed.length > noVui.length, "SPS was not extended");
+    assert.strictEqual(Buffer.from(fixed.slice(0, 4)).toString("hex"), "674d4020", "profile / level bytes changed");
+    assert.strictEqual(Buffer.compare(Buffer.from(fixSps(fixed)), Buffer.from(fixed)), 0, "a fixed SPS must be left alone");
   });
   await test("live video: picture size and changed-picture counting", () => {
     const stream = require("../src/device/stream");

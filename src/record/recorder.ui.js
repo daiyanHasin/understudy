@@ -466,13 +466,92 @@ var Rec = (function () {
     }
     drawAll();
   }
+  /* ---- SPS fix: "show every picture at once" (2.0.1) ----
+     Many phone encoders write an SPS (the stream's settings) without "bitstream restriction".
+     A decoder must then assume pictures may come out of order and holds back several of them
+     (up to 16) before showing any: the picture runs behind the phone, and when the phone stops
+     moving the last pictures stay stuck until something moves again. Phones never reorder
+     pictures here, so the SPS is rewritten to say so: max_num_reorder_frames = 0. The decoder
+     then shows each picture as soon as it is decoded. Any surprise in the SPS: it is left as is. */
+  // BEGIN fixSps
+  function fixSps(nal) {
+    // RBSP without emulation-prevention bytes
+    var rb = [], z = 0, i;
+    for (i = 1; i < nal.length; i++) {
+      if (z >= 2 && nal[i] === 3) { z = 0; continue; }
+      z = nal[i] === 0 ? z + 1 : 0; rb.push(nal[i]);
+    }
+    var pos = 0, out = [], cur = 0, nb = 0;
+    function bit() { if (pos >= rb.length * 8) throw new Error("short SPS"); var b = (rb[pos >> 3] >> (7 - (pos & 7))) & 1; pos++; return b; }
+    function u(n) { var v = 0; for (var k = 0; k < n; k++) v = v * 2 + bit(); return v; }
+    function ue() { var lz = 0; while (!bit()) { if (++lz > 31) throw new Error("bad ue"); } return Math.pow(2, lz) - 1 + u(lz); }
+    function se() { var k = ue(); return k & 1 ? (k + 1) / 2 : -(k / 2); }
+    function wb(b) { cur = (cur << 1) | b; if (++nb === 8) { out.push(cur); cur = 0; nb = 0; } }
+    function wu(n, v) { for (var k = n - 1; k >= 0; k--) wb(Math.floor(v / Math.pow(2, k)) & 1); }
+    function wue(v) { var x = v + 1, len = Math.floor(Math.log2(x)); wu(len, 0); wu(len + 1, x); }
+    function wse(v) { wue(v > 0 ? 2 * v - 1 : -2 * v); }
+    function cu(n) { var v = u(n); wu(n, v); return v; }
+    function cue() { var v = ue(); wue(v); return v; }
+    function cse() { var v = se(); wse(v); return v; }
+    function hrd() {
+      var cnt = cue(); cu(4); cu(4);
+      for (var k = 0; k <= cnt; k++) { cue(); cue(); cu(1); }
+      cu(5); cu(5); cu(5); cu(5);
+    }
+    var profile = cu(8); cu(8); cu(8); cue();
+    if ([100, 110, 122, 244, 44, 83, 86, 118, 128, 138, 139, 134, 135].indexOf(profile) >= 0) {
+      var chroma = cue(); if (chroma === 3) cu(1);
+      cue(); cue(); cu(1);
+      if (cu(1)) {
+        for (i = 0; i < (chroma !== 3 ? 8 : 12); i++) {
+          if (cu(1)) { var size = i < 6 ? 16 : 64, last = 8, next = 8;
+            for (var j = 0; j < size; j++) { if (next !== 0) { var d = cse(); next = (last + d + 256) % 256; } last = next === 0 ? last : next; } }
+        }
+      }
+    }
+    cue();                                            // log2_max_frame_num_minus4
+    var poc = cue();
+    if (poc === 0) cue();
+    else if (poc === 1) { cu(1); cse(); cse(); var n = cue(); for (i = 0; i < n; i++) cse(); }
+    var refs = cue(); cu(1); cue(); cue();
+    if (!cu(1)) cu(1);                                // frame_mbs_only_flag / mb_adaptive_frame_field_flag
+    cu(1);
+    if (cu(1)) { cue(); cue(); cue(); cue(); }        // frame cropping
+    var restriction = { reorder: 0, buffering: Math.max(1, refs) };
+    var vui = u(1); wu(1, 1);
+    if (vui) {
+      if (cu(1)) { if (cu(8) === 255) { cu(16); cu(16); } }
+      if (cu(1)) cu(1);
+      if (cu(1)) { cu(3); cu(1); if (cu(1)) { cu(8); cu(8); cu(8); } }
+      if (cu(1)) { cue(); cue(); }
+      if (cu(1)) { cu(32); cu(32); cu(1); }
+      var nal_hrd = cu(1); if (nal_hrd) hrd();
+      var vcl_hrd = cu(1); if (vcl_hrd) hrd();
+      if (nal_hrd || vcl_hrd) cu(1);
+      cu(1);                                          // pic_struct_present_flag
+      if (u(1)) return nal;                           // the encoder already says how it orders pictures: trust it
+    } else {
+      wu(1, 0); wu(1, 0); wu(1, 0); wu(1, 0); wu(1, 0); wu(1, 0); wu(1, 0); wu(1, 0);
+    }
+    wu(1, 1);                                         // bitstream_restriction_flag
+    wu(1, 1); wue(2); wue(1); wue(16); wue(16); wue(restriction.reorder); wue(restriction.buffering);
+    wb(1); while (nb) wb(0);                          // rbsp trailing bits
+    // Emulation prevention back in, NAL header first
+    var res = [nal[0]]; z = 0;
+    for (i = 0; i < out.length; i++) {
+      if (z >= 2 && out[i] <= 3) { res.push(3); z = 0; }
+      res.push(out[i]); z = out[i] === 0 ? z + 1 : 0;
+    }
+    return new Uint8Array(res);
+  }
+  // END fixSps
   function canVideo() {
     return !!(window.VideoDecoder && window.EncodedVideoChunk && S.serial && S.dw && S.dh &&
               !S.noVideo[S.serial] && Date.now() > S.videoWaitUntil);
   }
   function startVideo(gen) {
     var serial = S.serial, ctrl = window.AbortController ? new AbortController() : null;
-    var dec = null, configured = false, gotKey = false, ts = 0, sps = null;
+    var dec = null, configured = false, configuring = false, pending = [], gotKey = false, ts = 0, sps = null, sent = 0, drawn = 0;
     var buf = new Uint8Array(0), starts = [], scan = 0, au = [], auSlice = false, auKey = false, flushT = null;
     var frames = 0, shown = false, done = false, t0 = Date.now();
     var v = { stop: stop };
@@ -514,6 +593,7 @@ var Rec = (function () {
     function onNal(n) {
       if (!n.length) return;
       var t = n[0] & 31;
+      if (t === 7) { try { n = fixSps(n); } catch (e) { /* keep it as the phone wrote it */ } }
       if (t === 7 || t === 8 || t === 6 || t === 9) { if (auSlice) emit(); if (t === 7) sps = n; au.push(n); return; }
       if (t === 1 || t === 5) {
         if (auSlice && n.length > 1 && (n[1] & 0x80)) emit();      // first slice of a new picture
@@ -522,23 +602,42 @@ var Rec = (function () {
       au.push(n);
     }
     function hex(x) { return (x < 16 ? "0" : "") + x.toString(16); }
+    /* The PC's software decoder first: for a phone-sized picture it costs little CPU and
+       shows each picture the moment it arrives. Some graphics-card decoders hold pictures
+       back. Not available: the browser's default decoder. */
     function configure() {
-      dec = new VideoDecoder({ output: draw, error: function (e) { backToShots("decoder: " + (e && e.message)); } });
-      dec.configure({ codec: "avc1." + hex(sps[1]) + hex(sps[2]) + hex(sps[3]), optimizeForLatency: true });
-      configured = true;
+      configuring = true;
+      var base = { codec: "avc1." + hex(sps[1]) + hex(sps[2]) + hex(sps[3]), optimizeForLatency: true };
+      var sw = Object.assign({ hardwareAcceleration: "prefer-software" }, base);
+      var check = VideoDecoder.isConfigSupported ? VideoDecoder.isConfigSupported(sw).catch(function () { return { supported: false }; })
+                                                 : Promise.resolve({ supported: false });
+      check.then(function (r) {
+        if (!alive()) return;
+        try {
+          dec = new VideoDecoder({ output: draw, error: function (e) { backToShots("decoder: " + (e && e.message)); } });
+          dec.configure(r && r.supported ? sw : base);
+          configured = true;
+          var q = pending; pending = [];
+          q.forEach(decode);
+        } catch (e) { backToShots("configure: " + e.message); }
+      });
+    }
+    function decode(c) {
+      dec.decode(new EncodedVideoChunk(c)); sent++;
     }
     function emit() {
       if (!auSlice) return;                 // SPS / PPS wait for their picture
       var key = auKey, parts = au; au = []; auSlice = false; auKey = false;
       if (!alive()) return;
       try {
-        if (key && !configured) { if (!sps) return; configure(); }
-        if (!configured || (!key && !gotKey)) return;
+        if (key && !configured && !configuring) { if (!sps) return; configure(); }
+        if (!key && !gotKey) return;
         if (key) gotKey = true;
         var len = 0; parts.forEach(function (p) { len += 4 + p.length; });
         var data = new Uint8Array(len), o = 0;
         parts.forEach(function (p) { data[o + 3] = 1; data.set(p, o + 4); o += 4 + p.length; });
-        dec.decode(new EncodedVideoChunk({ type: key ? "key" : "delta", timestamp: (ts += 16667), data: data }));
+        var c = { type: key ? "key" : "delta", timestamp: (ts += 16667), data: data };
+        if (configured) decode(c); else pending.push(c);
       } catch (e) { backToShots("decode: " + e.message); }
     }
     function draw(f) {
@@ -548,12 +647,17 @@ var Rec = (function () {
       S.ctx = S.ctx || c.getContext("2d");
       S.ctx.drawImage(f, 0, 0, c.width, c.height);
       f.close();
-      frames++; shown = true; S.streamErr = 0; S.videoFails[serial] = 0; setStage("live");
+      frames++; drawn++; shown = true; S.streamErr = 0; S.videoFails[serial] = 0; setStage("live");
     }
     v.tick = setInterval(function () {
       if (!alive()) return;
       if (!shown && Date.now() - t0 > 6000) { backToShots("no picture in 6 s"); return; }
-      if (shown) liveLabel(frames ? "Live \u00b7 " + frames + " fps" : "Live \u00b7 screen still", "on");
+      if (shown) {
+        // Pictures handed to the decoder but not shown yet: should be 0-1 (shown on hover)
+        var behind = Math.max(0, sent - drawn);
+        liveLabel(frames ? "Live " + frames + " fps" : "Live, still", "on");
+        $("recLive").title = "Live video from the phone. Pictures waiting in the decoder: " + behind;
+      }
       frames = 0;
       fetchLayout();
     }, 1000);

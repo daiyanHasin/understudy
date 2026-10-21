@@ -65,15 +65,20 @@ async function homePackage(serial) {
 }
 const NOT_THE_APP = /^(android|com\.android\.systemui|com\.android\.(permissioncontroller|packageinstaller)|com\.google\.android\.(permissioncontroller|packageinstaller|inputmethod\.\w+)|com\.samsung\.android\.honeyboard|com\.sec\.android\.inputmethod|com\.touchtype\.swiftkey|com\.android\.inputmethod\.\w+)$/;
 function appFromNodes(nodes, home) {
+  // A window belongs to the package of its FIRST (root) element. Elements of other packages
+  // inside it are widgets (the home screen's clock or weather widget reports the Clock app's
+  // package), so they never make their own app "the app in front".
   const byWin = new Map();
   (nodes || []).forEach(n => {
-    if (!n.pkg || !PKG_RE.test(n.pkg) || NOT_THE_APP.test(n.pkg) || n.pkg === home) return;
-    if (/INPUT_METHOD|SYSTEM|ACCESSIBILITY|MAGNIFICATION/.test(n.wtype || "")) return;
     const w = n.win || 0;
-    if (!byWin.has(w)) byWin.set(w, { layer: n.layer || 0, pkg: n.pkg, area: 0 });
+    if (!byWin.has(w)) byWin.set(w, { layer: n.layer || 0, pkg: n.pkg || "", wtype: n.wtype || "", area: 0 });
     const e = byWin.get(w);
     if (e.pkg === n.pkg) e.area = Math.max(e.area, (n.x2 - n.x1) * (n.y2 - n.y1));
   });
+  for (const [w, e] of byWin) {
+    if (!e.pkg || !PKG_RE.test(e.pkg) || NOT_THE_APP.test(e.pkg) || e.pkg === home ||
+        /INPUT_METHOD|SYSTEM|ACCESSIBILITY|MAGNIFICATION/.test(e.wtype)) byWin.delete(w);
+  }
   // Top window first; a tiny window (a toast, a bubble) does not count as the app
   const list = Array.from(byWin.values()).filter(e => e.area > 40000).sort((a, b) => b.layer - a.layer || b.area - a.area);
   return list.length ? list[0].pkg : "";
