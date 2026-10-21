@@ -33,7 +33,11 @@
  *   Device:    setLocation {lat, lon}   airplane {on}   record {action:"start"|"stop", name}
  *
  *   rec.env = { NAME: "value" } -> `env:` in the flow header, used as ${NAME}
- * sel: { kind:"id"|"text"|"point", value, exact, text?, index? }
+ * sel: { kind:"id"|"text"|"point"|"rel", value, exact, text?, index?, rel? }
+ *        rel   = { dir:"below"|"above"|"leftOf"|"rightOf", kind:"text"|"id", value, exact }
+ *                "next to another element" (Maestro below: / above: / leftOf: / rightOf:)
+ *        kind "rel" = found ONLY by where it is (no id / text of its own, e.g. a text field
+ *                whose placeholder Android doesn't report); value = the other element's value
  *        exact = already a regex, don't escape
  *        text  = (id only) the same element must also show this text      -> id + text
  *        index = 0-based, among the matches sorted top-to-bottom, then left-to-right

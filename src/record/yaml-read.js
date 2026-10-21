@@ -13,15 +13,36 @@ function selFrom(v) {
   if (typeof v === "string" || typeof v === "number") return { kind: "text", value: String(v), exact: true };
   if (v && typeof v === "object" && !Array.isArray(v)) {
     const keys = Object.keys(v);
-    if (!keys.length || keys.some(k => typeof v[k] === "object")) return null;
+    const REL = ["below", "above", "leftOf", "rightOf"];
+    // Next to another element: below: "Password" or below: { id: "..." } / { text: "..." } (one of them)
+    const relKeys = keys.filter(k => REL.includes(k));
+    let rel = null;
+    if (relKeys.length > 1) return null;
+    if (relKeys.length === 1) {
+      const r = v[relKeys[0]];
+      if (typeof r === "string" || typeof r === "number") rel = { dir: relKeys[0], kind: "text", value: String(r), exact: true };
+      else if (r && typeof r === "object" && !Array.isArray(r) && Object.keys(r).length === 1 &&
+               (typeof r.id === "string" || typeof r.text === "string"))
+        rel = { dir: relKeys[0], kind: r.id !== undefined ? "id" : "text", value: String(r.id !== undefined ? r.id : r.text), exact: true };
+      else return null;
+      if (!rel.value) return null;
+    }
+    if (!keys.length || keys.some(k => !REL.includes(k) && typeof v[k] === "object")) return null;
+    if (rel && !keys.some(k => k === "id" || k === "text")) {
+      if (!keys.every(k => k === relKeys[0] || k === "index")) return null;
+      const sel = { kind: "rel", value: rel.value, exact: true, rel };
+      if (v.index !== undefined) { if (!/^\d{1,3}$/.test(String(v.index))) return null; sel.index = +v.index; }
+      return sel;
+    }
     if (keys.length === 1 && keys[0] === "point") {
       const value = String(v.point);
       return PCT_RE.test(value) ? { kind: "point", value, exact: true } : null;
     }
     // id, text, id + text, and any of them with index
-    if (keys.every(k => k === "id" || k === "text" || k === "index") && (v.id !== undefined || v.text !== undefined)) {
+    if (keys.every(k => k === "id" || k === "text" || k === "index" || k === relKeys[0]) && (v.id !== undefined || v.text !== undefined)) {
       const sel = v.id !== undefined ? { kind: "id", value: String(v.id), exact: true } : { kind: "text", value: String(v.text), exact: true };
       if (v.id !== undefined && v.text !== undefined) sel.text = String(v.text);
+      if (rel) sel.rel = rel;
       if (v.index !== undefined) {
         if (!/^\d{1,3}$/.test(String(v.index))) return null;
         sel.index = +v.index;

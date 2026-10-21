@@ -16,8 +16,14 @@ const CMD = { tap: "tapOn", doubleTap: "doubleTapOn", longPress: "longPressOn",
 function selLines(sel, pad) {
   if (sel.kind === "point") return [pad + "point: " + q(sel.value)];
   const rx = v => q(sel.exact ? v : reEscape(v));
-  const L = [pad + sel.kind + ": " + rx(sel.value)];
+  const L = sel.kind === "rel" ? [] : [pad + sel.kind + ": " + rx(sel.value)];
   if (sel.kind === "id" && sel.text) L.push(pad + "text: " + rx(sel.text));
+  // Next to another element: below: "Password"  /  below: { id: "..." }
+  if (sel.rel) {
+    const r = sel.rel, rv = q(r.exact ? r.value : reEscape(r.value));
+    if (r.kind === "text") L.push(pad + r.dir + ": " + rv);
+    else L.push(pad + r.dir + ":", pad + "  id: " + rv);
+  }
   if (sel.index != null) L.push(pad + "index: " + sel.index);
   return L;
 }

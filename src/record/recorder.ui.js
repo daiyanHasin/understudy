@@ -561,17 +561,25 @@ var Rec = (function () {
   }
   function selYaml(cmd, c) {
     if (c.kind === "point") return "- " + cmd + ":\n    point: " + q(c.value);
-    if (c.kind === "text" && c.index == null) return "- " + cmd + ": " + q(reEsc(c.value));
-    var y = "- " + cmd + ":\n    " + c.kind + ": " + q(reEsc(c.value));
+    if (c.kind === "text" && c.index == null && !c.rel) return "- " + cmd + ": " + q(reEsc(c.value));
+    var y = "- " + cmd + ":";
+    if (c.kind !== "rel") y += "\n    " + c.kind + ": " + q(reEsc(c.value));
     if (c.kind === "id" && c.text) y += "\n    text: " + q(reEsc(c.text));
+    if (c.rel) y += c.rel.kind === "id" ? "\n    " + c.rel.dir + ":\n      id: " + q(reEsc(c.rel.value))
+                                        : "\n    " + c.rel.dir + ": " + q(reEsc(c.rel.value));
     if (c.index != null) y += "\n    index: " + c.index;
     return y;
   }
   function selOf(c) {                    // the part of a candidate a step keeps
     var o = { kind: c.kind, value: c.value };
     if (c.text) o.text = c.text;
+    if (c.rel) o.rel = { dir: c.rel.dir, kind: c.rel.kind, value: c.rel.value, exact: !!c.rel.exact };
     if (c.index != null) o.index = c.index;
     return o;
+  }
+  function sameRel(a, b) {
+    if (!a || !b) return !a && !b;
+    return a.dir === b.dir && a.kind === b.kind && a.value === b.value;
   }
   function renderInspector(target, cands, pinned) {
     var box = $("recInspect"); box.innerHTML = "";
@@ -1297,7 +1305,7 @@ var Rec = (function () {
       var sel = document.createElement("select"); sel.className = "rsel";
       s.candidates.forEach(function (c, k) {
         var o = opt(sel, String(k), c.label + (c.unique ? "" : "  (" + c.count + " matches)"));
-        if (c.kind === s.sel.kind && c.value === s.sel.value && (c.text || "") === (s.sel.text || "") && (c.index == null ? s.sel.index == null : c.index === s.sel.index)) o.selected = true;
+        if (c.kind === s.sel.kind && c.value === s.sel.value && (c.text || "") === (s.sel.text || "") && (c.index == null ? s.sel.index == null : c.index === s.sel.index) && sameRel(c.rel, s.sel.rel)) o.selected = true;
       });
       opt(sel, "custom", "Edit target\u2026");
       sel.onchange = function () {
@@ -1310,12 +1318,44 @@ var Rec = (function () {
     } else {
       var row = el("div", "selrow");
       var kind = document.createElement("select");
-      [["id", "ID"], ["text", "Text"], ["point", "Position"]].forEach(function (k) { opt(kind, k[0], k[1]); });
+      [["id", "ID"], ["text", "Text"], ["rel", "Only by position next to\u2026"], ["point", "Position"]].forEach(function (k) { opt(kind, k[0], k[1]); });
       kind.value = s.sel.kind;
-      var val = document.createElement("input"); val.type = "text"; val.className = "rval"; val.value = s.sel.value; val.spellcheck = false;
-      kind.onchange = function () { s.sel = { kind: kind.value, value: val.value, exact: s.sel.exact }; onchange(); };
-      val.onchange = function () { s.sel = { kind: kind.value, value: val.value, exact: s.sel.exact }; onchange(); };
+      var val = document.createElement("input"); val.type = "text"; val.className = "rval"; val.value = s.sel.kind === "rel" ? "" : s.sel.value; val.spellcheck = false;
+      val.hidden = s.sel.kind === "rel";
       row.appendChild(kind); row.appendChild(val); box.appendChild(row);
+      /* "Next to another element": for a field Android reports without its placeholder (or anything
+         without its own ID / text): below "Password", right of "Name" ... Maestro below: / above: /
+         leftOf: / rightOf:. The other element is found by its text or ID. */
+      var rr = el("div", "selrow");
+      var dir = document.createElement("select"); dir.setAttribute("aria-label", "Next to another element");
+      [["", "\u2014 not next to anything"], ["below", "below"], ["above", "above"], ["rightOf", "right of"], ["leftOf", "left of"]].forEach(function (k) { opt(dir, k[0], k[1]); });
+      var rk = document.createElement("select"); rk.setAttribute("aria-label", "Find the other element by");
+      [["text", "text"], ["id", "ID"]].forEach(function (k) { opt(rk, k[0], k[1]); });
+      var rv = document.createElement("input"); rv.type = "text"; rv.className = "rval"; rv.spellcheck = false;
+      rv.placeholder = "e.g. Password";
+      var r0 = s.sel.rel || null;
+      dir.value = r0 ? r0.dir : ""; rk.value = r0 ? r0.kind : "text"; rv.value = r0 ? r0.value : "";
+      var idx = document.createElement("input"); idx.type = "number"; idx.min = 0; idx.max = 500; idx.className = "rval small";
+      idx.placeholder = "index"; idx.title = "Only if Maestro finds the wrong one: 0 = the first match from the top";
+      idx.value = s.sel.index != null ? s.sel.index : "";
+      function relOn() { var on = kind.value !== "point"; rr.hidden = !on; rk.hidden = rv.hidden = !dir.value; }
+      function apply() {
+        val.hidden = kind.value === "rel";
+        if (kind.value === "rel" && !dir.value) dir.value = "below";
+        relOn();
+        var sel = { kind: kind.value, value: kind.value === "rel" ? rv.value : val.value, exact: s.sel.exact };
+        if (kind.value !== "point" && dir.value) sel.rel = { dir: dir.value, kind: rk.value, value: rv.value, exact: false };
+        if (kind.value !== "point" && idx.value !== "") sel.index = Math.max(0, Math.min(500, parseInt(idx.value, 10) || 0));
+        s.sel = sel;
+        // Wait for the other element's text before checking the step (an empty one is refused)
+        if (sel.rel && !String(sel.rel.value).trim()) return;
+        onchange();
+      }
+      [kind, val, dir, rk, rv, idx].forEach(function (x) { x.onchange = apply; });
+      rr.appendChild(el("span", "dim", "next to"));
+      rr.appendChild(dir); rr.appendChild(rk); rr.appendChild(rv); rr.appendChild(idx);
+      box.appendChild(rr);
+      relOn();
     }
     if (s.unsure) box.appendChild(el("div", "rwarn", "The screen was still changing when this was tapped. Check the target."));
     return box;

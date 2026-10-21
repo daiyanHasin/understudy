@@ -139,6 +139,26 @@ const rel = p => path.relative(ROOT, p).split(path.sep).join("/");
     assert.strictEqual(r.candidates[0].kind, "id");
     assert.strictEqual(recorder.matches(nodes, { kind: "text", value: "Log in", exact: true }).length, 2);
   });
+  await test("text field without placeholder: found next to its label (below \u201CPassword\u201D), as Maestro picks it", async () => {
+    const N = (o) => Object.assign({ text: "", id: "", desc: "", hint: "", cls: "android.view.View", pkg: "a.b", clickable: false, win: 1, layer: 0, wtype: "" }, o);
+    const nodes = [
+      N({ i: 0, parent: -1, x1: 0, y1: 0, x2: 1080, y2: 2400 }),
+      N({ i: 1, parent: 0, text: "Email", cls: "android.widget.TextView", x1: 40, y1: 400, x2: 300, y2: 460 }),
+      N({ i: 2, parent: 0, cls: "android.widget.EditText", editable: true, clickable: true, x1: 40, y1: 470, x2: 1040, y2: 600 }),
+      N({ i: 3, parent: 0, text: "Password", cls: "android.widget.TextView", x1: 40, y1: 650, x2: 300, y2: 710 }),
+      N({ i: 4, parent: 0, cls: "android.widget.EditText", editable: true, clickable: true, password: true, x1: 40, y1: 720, x2: 1040, y2: 850 }),
+      N({ i: 5, parent: 0, text: "Sign in", cls: "android.widget.Button", clickable: true, x1: 40, y1: 950, x2: 1040, y2: 1080 })];
+    const sel = require("../src/record/selectors");
+    const r = recorder.inspect(nodes, 500, 780);
+    const c = r.candidates[0];
+    assert.ok(c.rel && c.rel.dir === "below" && c.rel.value === "Password", "expected below Password, got " + JSON.stringify(c));
+    assert.strictEqual(sel.maestroFind(nodes, c)[0].i, 4, "Maestro would pick another element");
+    const y = recorder.buildYaml({ appId: "a.b", flow: "t.yaml", steps: [{ type: "tap", sel: c }] }).yaml;
+    assert.ok(/- tapOn:\s*\n\s+below: "Password"/.test(y), "YAML:\n" + y);
+    const back = await recorder.parseYaml(y, []);
+    assert.strictEqual(back.steps[0].sel.kind, "rel");
+    assert.strictEqual(recorder.buildYaml(Object.assign({ flow: "t.yaml" }, back)).yaml, y, "changed after a round trip");
+  });
   await test("YAML editor keeps steps it understands and unknown commands word for word", async () => {
     const y = "appId: a.b\n---\n- launchApp\n- tapOn: \"Hi\"\n- someFutureCommand:\n    foo: bar\n";
     const r = await recorder.parseYaml(y, []);

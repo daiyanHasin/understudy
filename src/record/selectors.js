@@ -85,8 +85,11 @@ function inspect(nodes, x, y) {
                        label: best.label.split(/\s{2}/)[0] + " #" + (best.pos + 1) + " of " + best.count + "  " + best.label.split(/\s{2}/).slice(1).join("  ") });
   }
   c.forEach(o => { delete o.pos; });
-  // Unique and stable first, then "Nth match", then not unique; the screen position is always last
-  const rank = o => o.unique ? (o.fragile ? 1 : 0) : 2;
+  // Nothing unique and stable (typical: a text field whose placeholder Android doesn't report,
+  // or an app without IDs): find it next to an element that IS findable, e.g. "below Password"
+  if (!c.some(o => o.unique && !o.fragile)) relativeCandidates(nodes, target, c).forEach(o => c.push(o));
+  // Unique and stable first, then "next to ...", then "Nth match", then not unique; the screen position is always last
+  const rank = o => o.unique ? (o.fragile ? 1 : o.rel ? 0.5 : 0) : 2;
   c.sort((a, b) => rank(a) - rank(b));
   c.push(point);
 
@@ -152,6 +155,159 @@ function isInside(nodes, n, outer) {
   return false;
 }
 
+/* ======================= Relative targets (below / above / left of / right of) =======================
+ * Maestro can find an element by where it is next to another one:
+ *     - tapOn:
+ *         below: "Password"          (the text, label or placeholder of the other element)
+ *         index: 2                   (only when needed)
+ * maestroFind() repeats how Maestro picks the element (Orchestra.buildFilter + Filters.kt):
+ *   1. "basic" matches (id / text), deepest element only, in tree order; no id/text = every element
+ *   2. keep those that are below / above / left of / right of ANY element matching the other one.
+ *      Maestro compares the top-left corners: below = its top is lower than the other's top.
+ *   3. with index: sorted top-to-bottom, then left-to-right, take that one; without index: clickable
+ *      elements first (stable), take the first.
+ * Every relative choice offered is checked with maestroFind() on this screen, so it is known to tap
+ * the element that was clicked. When Maestro would pick another one, the index that fixes it is added.
+ */
+const REL_DIRS = ["below", "above", "rightOf", "leftOf"];
+const REL_TEST = {
+  below:   (n, a) => n.y1 > a.y1,
+  above:   (n, a) => n.y1 < a.y1,
+  leftOf:  (n, a) => n.x1 < a.x1,
+  rightOf: (n, a) => n.x1 > a.x1
+};
+const REL_WORD = { below: "Below", above: "Above", leftOf: "Left of", rightOf: "Right of" };
+
+function deepestInOrder(nodes, pred) {
+  const hits = nodes.filter(pred);
+  const hitSet = new Set(hits.map(n => n.i));
+  const byI = new Map(nodes.map(n => [n.i, n]));
+  const anc = new Set();
+  hits.forEach(h => {
+    let p = h.parent, guard = 0;
+    while (p !== undefined && p >= 0 && guard++ < 200) {
+      if (hitSet.has(p)) anc.add(p);
+      const pn = byI.get(p); p = pn ? pn.parent : -1;
+    }
+  });
+  return hits.filter(n => !anc.has(n.i)).sort((a, b) => a.i - b.i);
+}
+
+/** The elements Maestro would consider for a selector, in the order it picks them (first = chosen). */
+function maestroFind(nodes, sel) {
+  const all = nodes.slice().sort((a, b) => a.i - b.i);
+  let res = sel.kind === "rel" ? all : deepestInOrder(all, n => selMatch(n, sel));
+  if (sel.rel) {
+    const anchors = maestroFind(nodes, { kind: sel.rel.kind, value: sel.rel.value });
+    const test = REL_TEST[sel.rel.dir];
+    res = res.filter(n => anchors.some(a => test(n, a)));
+  }
+  if (sel.index != null) {
+    const sorted = res.map((n, k) => [n, k]).sort((x, y) => x[0].y1 - y[0].y1 || x[0].x1 - y[0].x1 || x[1] - y[1]).map(x => x[0]);
+    return sorted[sel.index] ? [sorted[sel.index]] : [];
+  }
+  return res.map((n, k) => [n, k]).sort((x, y) => (y[0].clickable - x[0].clickable) || x[1] - y[1]).map(x => x[0]);
+}
+
+/** Does tapping `pick` (Maestro taps its centre) hit `target`? Same element, or one with the same box. */
+function sameSpot(pick, target) {
+  if (!pick) return false;
+  if (pick.i === target.i) return true;
+  const cx = (pick.x1 + pick.x2) / 2, cy = (pick.y1 + pick.y2) / 2;
+  const tx = (target.x1 + target.x2) / 2, ty = (target.y1 + target.y2) / 2;
+  return cx >= target.x1 && cx < target.x2 && cy >= target.y1 && cy < target.y2 &&
+         tx >= pick.x1 && tx < pick.x2 && ty >= pick.y1 && ty < pick.y2;
+}
+
+/** Elements that make a good "next to" reference: findable by their own unique text, label or ID. */
+function anchorsFor(nodes, target) {
+  const byI = new Map(nodes.map(n => [n.i, n]));
+  const related = n => {               // the target itself, inside it, or around it
+    if (n.i === target.i) return true;
+    for (const [a, b] of [[n, target], [target, n]]) {
+      let p = a.parent, guard = 0;
+      while (p !== undefined && p >= 0 && guard++ < 200) { if (p === b.i) return true; const pn = byI.get(p); p = pn ? pn.parent : -1; }
+    }
+    return false;
+  };
+  const out = [];
+  nodes.forEach(n => {
+    if (n.x2 <= n.x1 || n.y2 <= n.y1 || related(n)) return;
+    const tries = [];
+    if (n.text && n.text.length <= 60 && !n.editable) tries.push({ kind: "text", value: n.text });
+    if (n.desc && n.desc.length <= 60) tries.push({ kind: "text", value: n.desc });
+    if (n.hint && n.hint.length <= 60) tries.push({ kind: "text", value: n.hint });
+    if (n.id) tries.push({ kind: "id", value: n.id });
+    for (const t of tries) {
+      const hits = deepestInOrder(nodes, x => selMatch(x, t));
+      if (hits.length === 1 && hits[0].i === n.i) { out.push({ node: n, sel: t }); break; }
+    }
+  });
+  return out;
+}
+
+/** Nearest findable element in each direction, as reference points. */
+function nearest(anchors, target, dir) {
+  const tcx = (target.x1 + target.x2) / 2, tcy = (target.y1 + target.y2) / 2;
+  const vOverlap = a => Math.min(a.y2, target.y2) - Math.max(a.y1, target.y1) > 0;
+  const hOverlap = a => Math.min(a.x2, target.x2) - Math.max(a.x1, target.x1) > 0;
+  const scored = anchors.map(x => {
+    const a = x.node, acx = (a.x1 + a.x2) / 2, acy = (a.y1 + a.y2) / 2;
+    let d = null;
+    // "below: A" means the target is below A, so A is above the target (and so on)
+    if (dir === "below"   && REL_TEST.below(target, a))   d = Math.max(0, target.y1 - a.y2) + Math.abs(tcx - acx) * (hOverlap(a) ? 0.2 : 1);
+    if (dir === "above"   && REL_TEST.above(target, a))   d = Math.max(0, a.y1 - target.y2) + Math.abs(tcx - acx) * (hOverlap(a) ? 0.2 : 1);
+    if (dir === "rightOf" && REL_TEST.rightOf(target, a) && vOverlap(a)) d = Math.max(0, target.x1 - a.x2) + Math.abs(tcy - acy);
+    if (dir === "leftOf"  && REL_TEST.leftOf(target, a)  && vOverlap(a)) d = Math.max(0, a.x1 - target.x2) + Math.abs(tcy - acy);
+    return d === null ? null : { x, d };
+  }).filter(Boolean).sort((p, q) => p.d - q.d);
+  return scored.slice(0, 2).map(s => s.x);
+}
+
+/**
+ * "Below Password"-style choices for `target`, each verified with maestroFind().
+ * Returned as candidates: { kind, value, rel:{dir,kind,value}, index?, unique, fragile?, label }.
+ */
+function relativeCandidates(nodes, target, existing) {
+  const scope = nodes;                                  // Maestro sees every window
+  const window = nodes.filter(n => (n.win || 0) === (target.win || 0));
+  const anchors = anchorsFor(scope, target);
+  if (!anchors.length) return [];
+  const bases = [{ kind: "rel" }];
+  if (target.id) bases.unshift({ kind: "id", value: target.id });
+  const stable = [], indexed = [];
+  for (const dir of REL_DIRS) {
+    for (const a of nearest(anchors, target, dir)) {
+      for (const b of bases) {
+        const sel = { kind: b.kind, value: b.kind === "rel" ? a.sel.value : b.value,
+                      rel: { dir, kind: a.sel.kind, value: a.sel.value } };
+        const what = a.sel.kind === "id" ? "ID " + a.sel.value.split(":id/").pop() : "\u201C" + a.sel.value + "\u201D";
+        const label = (b.kind === "id" ? "ID " + b.value.split(":id/").pop() + " \u00b7 " : "") + REL_WORD[dir] + "  " + what;
+        const ok = (list) => sameSpot(list[0], target);
+        if (ok(maestroFind(scope, sel)) && (window.length === scope.length || ok(maestroFind(window, sel)))) {
+          stable.push(Object.assign(sel, { unique: true, count: 1, label }));
+        } else {
+          // Which index would pick it? (sorted top-to-bottom, then left-to-right, like Maestro)
+          const pool = maestroFind(scope, Object.assign({}, sel, { index: undefined }))
+            .map((n, k) => [n, k]).sort((x, y) => x[0].y1 - y[0].y1 || x[0].x1 - y[0].x1 || x[1] - y[1]).map(x => x[0]);
+          const k = pool.findIndex(n => sameSpot(n, target));
+          if (k >= 0 && k <= 50) indexed.push(Object.assign(sel, { index: k, unique: true, count: 1, fragile: true,
+                                                                   label: label + "  #" + (k + 1) }));
+        }
+        if (stable.length >= 3) break;
+      }
+    }
+  }
+  const dup = (o, list) => list.some(x => x.kind === o.kind && x.value === o.value && x.rel && o.rel &&
+                                          x.rel.dir === o.rel.dir && x.rel.value === o.rel.value);
+  const out = [];
+  stable.concat(indexed.sort((x, y) => x.index - y.index)).forEach(o => {
+    if (!dup(o, out) && !dup(o, existing || [])) out.push(o);
+  });
+  // A few good choices, not a long list: up to 3 that need no index, else 1 with an index
+  return out.filter(o => !o.fragile).slice(0, 3).concat(out.some(o => !o.fragile) ? [] : out.filter(o => o.fragile).slice(0, 1));
+}
+
 /** When the screen layout can't be read: the step still gets the screen position. */
 function pointOnly(x, y, size, warning) {
   const pct = (v, t) => Math.max(0, Math.min(100, Math.round(v / t * 100)));
@@ -174,5 +330,6 @@ function compactNodes(nodes) {
 }
 
 module.exports = {
-  screenSize, nodesAt, inspect, suggestColumn, selMatch, matches, isInside, pointOnly, compactNodes
+  screenSize, nodesAt, inspect, suggestColumn, selMatch, matches, isInside, pointOnly, compactNodes,
+  maestroFind, relativeCandidates, REL_DIRS
 };

@@ -25,13 +25,35 @@ const area     = n => Math.max(1, (n.x2 - n.x1) * (n.y2 - n.y1));
 const contains = (n, x, y) => x >= n.x1 && x < n.x2 && y >= n.y1 && y < n.y2;
 const reEscape = s => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+/* "Next to another element" (sel.rel), see the step model at the top of recorder.js */
+const REL_DIRS = ["below", "above", "leftOf", "rightOf"];
+function checkRel(r) {
+  if (!r || typeof r !== "object") throw new Error("\u201CNext to\u201D needs the other element");
+  if (!REL_DIRS.includes(r.dir)) throw new Error("Next to: choose below, above, left of or right of");
+  if (r.kind !== "id" && r.kind !== "text") throw new Error("Next to: find the other element by its text or ID");
+  const v = String(r.value == null ? "" : r.value);
+  if (!v.trim() || v.length > 300) throw new Error("Next to: enter the other element's text or ID");
+  return { dir: r.dir, kind: r.kind, value: v, exact: !!r.exact };
+}
+
 function checkSel(sel) {
   if (!sel || typeof sel !== "object") throw new Error("A step is missing its target");
+  if (sel.kind === "rel") {
+    const rel = checkRel(sel.rel);
+    const out = { kind: "rel", value: rel.value, exact: rel.exact, rel };
+    if (sel.index != null && sel.index !== "") {
+      const k = parseInt(sel.index, 10);
+      if (!(k >= 0 && k <= 500)) throw new Error("Invalid target index: " + sel.index);
+      out.index = k;
+    }
+    return out;
+  }
   const v = String(sel.value == null ? "" : sel.value);
   if (!v || v.length > 300) throw new Error("A step has an empty or too long target");
   if (sel.kind === "point") { if (!PCT_RE.test(v)) throw new Error("Invalid screen position: " + v); return { kind: "point", value: v, exact: false }; }
   if (sel.kind !== "id" && sel.kind !== "text") throw new Error("Invalid target type");
   const out = { kind: sel.kind, value: v, exact: !!sel.exact };
+  if (sel.rel && sel.rel.dir) out.rel = checkRel(sel.rel);
   if (sel.kind === "id" && sel.text != null && String(sel.text) !== "") {
     const t = String(sel.text);
     if (t.length > 300) throw new Error("A step has a too long target text");
@@ -205,5 +227,5 @@ function checkData(d) {
 module.exports = {
   COLUMN_RE, BOOK_RE, SHEET_RE, FLOWNAME_RE, PCT_RE, MAX_STEPS, VAR_RE, REF_RE, APP_RE, KEY_NAMES,
   safe, area, contains, reEscape, SEL_TYPES,
-  checkSel, normStep, cleanEnv, walk, dataSteps, normalize, checkData
+  REL_DIRS, checkRel, checkSel, normStep, cleanEnv, walk, dataSteps, normalize, checkData
 };
