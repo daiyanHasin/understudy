@@ -51,9 +51,10 @@ Naming: in each feature folder, `x.js` = logic on the PC, `x.routes.js` = its HT
 | `src/device/android.js` | Index only: gathers every device file into one `require` |
 | `src/device/adb.js` | Finds adb/emulator/aapt; `run` and `shell` helpers (no shell injection); input checks; `devices()` |
 | `src/device/screen.js` | Record-tab frames: raw/gzip choice, read-ahead, decode + shrink, screen-change counter |
+| `src/device/stream.js` | Record-tab live video: phone's H.264 (`screenrecord`) piped to the window, screen changes from the stream |
 | `src/device/layout.js` | Elements on screen (`uiautomator dump`), one at a time per device, cached per screen change |
 | `src/device/input.js` | Tap, long press, swipe, keys, text (ADB Keyboard for non-English); screen size, touch device, keyboard area |
-| `src/device/apps.js` | Installed apps, app in front, launch, open link, install APK |
+| `src/device/apps.js` | Installed apps, app in front (also from the layout, for the Record tab's App field), launch, open link, install APK |
 | `src/device/emulator.js` | Virtual devices: list, start, why it closed, stop, snapshots; heavy processes / Free memory |
 | `src/device/wifi-connect.js` | Pair with code, connect by IP:port, USB → Wi-Fi in one click |
 | `src/device/wifi.js` | Plain-language reason a Wi-Fi phone can't be reached (TCP probe, PC networks) |

@@ -15,6 +15,7 @@ const P = require("../core/paths");
 const pairing = require("../device/pairing");
 const wifi = require("../device/wifi");
 const animations = require("../device/animations");
+const stream = require("../device/stream");
 const APK_LIMIT = 800 * 1024 * 1024;
 
 module.exports = function register(r, ctx) {
@@ -35,6 +36,7 @@ module.exports = function register(r, ctx) {
   POST("/api/device/stop", async (req, res) => {
     const b = await security.readJson(req);
     capture.stop(String(b.serial || ""));
+    stream.stop(String(b.serial || ""));
     await animations.restore(String(b.serial || "")).catch(() => {});
     json(res, 200, await android.stopDevice(b.serial));
   });
@@ -89,14 +91,17 @@ module.exports = function register(r, ctx) {
   GET("/api/device/layout", async (req, res, u) => {
     const serial = String(u.searchParams.get("serial") || "");
     android.checkSerial(serial);
+    // `app` = the app in front (from the same layout), so the Record tab can fill in "App" by itself
     if (u.searchParams.get("force") === "1" && !state.busy) {
       const l = await android.layout(serial);
-      return json(res, 200, { seq: l.seq, screenSeq: android.screenInfo(serial).seq, nodes: recorder.compactNodes(l.nodes) });
+      return json(res, 200, { seq: l.seq, screenSeq: android.screenInfo(serial).seq, nodes: recorder.compactNodes(l.nodes),
+                              app: await android.appInFront(serial, l.nodes) });
     }
     const info = android.screenInfo(serial);
     const snap = android.lastLayout(serial);
     if (!snap) return json(res, 200, { seq: 0, screenSeq: info.seq, nodes: [] });
-    json(res, 200, { seq: snap.seq, screenSeq: info.seq, nodes: recorder.compactNodes(snap.nodes) });
+    json(res, 200, { seq: snap.seq, screenSeq: info.seq, nodes: recorder.compactNodes(snap.nodes),
+                     app: snap.fresh ? await android.appInFront(serial, snap.nodes) : "" });
   });
   POST("/api/device/snapshot", async (req, res) => {
     deviceFree();
@@ -111,6 +116,11 @@ module.exports = function register(r, ctx) {
     h["Access-Control-Expose-Headers"] = "X-Frame-W, X-Frame-H, X-Device-W, X-Device-H";
     res.writeHead(200, h);
     res.end(f.data);
+  });
+  // Live screen video (H.264 from the phone's encoder), see src/device/stream.js
+  GET("/api/device/stream", (req, res, u) => {
+    stream.pipe(String(u.searchParams.get("serial") || ""), { dw: u.searchParams.get("dw"), dh: u.searchParams.get("dh") },
+                req, res, security.headers.api("application/octet-stream"));
   });
   POST("/api/device/input", async (req, res) => {
     deviceFree();

@@ -841,11 +841,15 @@ body.wide .mainwrap main.wrap { padding-top:14px; }
 @media (max-width:1100px) { .csave { margin-left:0; } .cgroup + .cgroup { border-left:0; } .cmdbar { gap:6px; } }
 
 /* Bench: stage on the left, script on the right */
-.bench { display:grid; grid-template-columns:minmax(380px, 460px) minmax(0, 1fr); gap:14px; align-items:stretch; }
+/* 2.0.1: the stage column is as wide as the phone picture (no empty bands), up to 760 px */
+.bench { display:grid; grid-template-columns:fit-content(760px) minmax(0, 1fr); gap:14px; align-items:stretch; }
 .bench > * { min-width:0; }
-@media (max-width:980px) { .bench { grid-template-columns:1fr; } }
+@media (max-width:980px) { .bench { grid-template-columns:1fr; } .stagepane { min-width:0; } }
 
-.stagepane { display:flex; flex-direction:column; gap:10px; }
+.stagepane { display:flex; flex-direction:column; gap:10px; min-width:300px; }
+/* These rows take the column's width instead of setting it, so the column is as wide as the phone */
+.stagepane > .modebar, .stagepane > .navbar, .stage > .stagebar { contain:inline-size; }
+.stagebar .live { min-width:0; overflow:hidden; text-overflow:ellipsis; }
 .modebar { display:grid; grid-template-columns:repeat(3, 1fr); gap:2px; padding:3px; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); }
 .mode { height:30px; border:0; background:transparent; padding:0 4px; border-radius:7px; color:var(--mute); font:500 12.5px var(--sans); cursor:pointer; white-space:nowrap; }
 .mode:hover { color:var(--ink); background:var(--surface-2); }
@@ -853,7 +857,7 @@ body.wide .mainwrap main.wrap { padding-top:14px; }
 #recMode-record.active { box-shadow:inset 0 -2px 0 var(--spot); }
 
 /* The stage: the one bold element */
-.stage { position:relative; border-radius:var(--radius); padding:48px 18px 46px; min-height:560px; display:flex; align-items:center; justify-content:center; overflow:hidden;
+.stage { position:relative; border-radius:var(--radius); padding:40px 12px 34px; min-height:420px; display:flex; align-items:center; justify-content:center; overflow:hidden;
   background:radial-gradient(circle, rgba(255,255,255,.07) 1px, transparent 1.2px) 0 0 / 18px 18px, var(--stage); }
 .stage[data-mode="interact"] { box-shadow:inset 0 0 0 1px rgba(255,255,255,.18); }
 .stagebar { position:absolute; left:12px; right:12px; top:10px; display:flex; align-items:center; gap:10px; z-index:4; }
@@ -871,7 +875,7 @@ body.wide .mainwrap main.wrap { padding-top:14px; }
 .sw input:checked::after { left:14px; transform:none; }
 .sw:hover { color:#fff; }
 .phone { position:relative; border-radius:28px; padding:8px; background:#1c1f24; box-shadow:0 0 0 1px #2e3238, 0 40px 80px -30px rgba(0,0,0,.9); }
-.phone canvas { display:block; width:auto; height:auto; max-width:100%; max-height:calc(100vh - 330px); min-height:200px; border-radius:21px; background:#000; cursor:crosshair; user-select:none; touch-action:none; }
+.phone canvas { display:block; width:auto; height:calc(100vh - 250px); max-width:none; min-height:200px; border-radius:21px; background:#000; cursor:crosshair; user-select:none; touch-action:none; }
 .stage[data-mode="interact"] .phone canvas, .stage[data-mode="device"] .phone canvas { cursor:pointer; }
 .stage.thinking .phone canvas { cursor:progress; }
 .stage:not([data-state="live"]) .phone { visibility:hidden; position:absolute; }
@@ -903,10 +907,12 @@ body.wide .mainwrap main.wrap { padding-top:14px; }
   border:2px solid rgba(217,154,30,.25); border-top-color:var(--spot); animation:spin 1s linear infinite; }
 .stage[data-state="waiting"] .emptyphone { stroke:var(--spot); }
 @keyframes spin { to { transform:rotate(360deg); } }
-.modehint { position:absolute; left:16px; right:16px; bottom:12px; text-align:center; font-size:12px; color:#8a8d93; line-height:1.45; min-height:0; }
+.modehint { position:absolute; left:12px; right:12px; bottom:9px; text-align:center; font-size:12px; color:#8a8d93; line-height:1.45; min-height:0;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .stage:not([data-state="live"]) .modehint { display:none; }
-.navbar { display:flex; flex-wrap:wrap; gap:4px; }
-.navbar .btn { height:28px; padding:0 9px; font-size:12px; color:var(--mute); }
+/* One row under the phone, however narrow the phone is (2.0.1) */
+.navbar { display:grid; grid-template-columns:repeat(7, minmax(0, auto)); justify-content:space-between; gap:3px; }
+.navbar .btn { height:28px; padding:0 6px; font-size:11.5px; color:var(--mute); min-width:0; overflow:hidden; white-space:nowrap; }
 .navbar .btn:hover { color:var(--ink); }
 
 /* Script pane: Steps | YAML | Inspect | AI */
@@ -1036,7 +1042,7 @@ textarea.yaml.dirty { border-color:var(--spot); box-shadow:0 0 0 3px var(--spot-
 .rstep .selrow select { width:96px; }
 .rstep .rval, .rstep .rsel { max-width:520px; }
 .stagebar .live, .sw { white-space:nowrap; }
-.phone canvas { max-height:calc(100vh - 360px); }
+.phone canvas.elmap { height:auto; }   /* the outline layer takes the picture's size (drawAll) */
 html.theme-dark .side { border-right:1px solid var(--line); }
 
 /* ---------- Element menu: one click on the screen, every action ---------- */

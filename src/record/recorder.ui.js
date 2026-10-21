@@ -20,7 +20,9 @@ var Rec = (function () {
     field: null, bootPoll: null, capTimer: null, capQueue: [], capBusy: false,
     lastChoice: localStorage.getItem("us.valueMode") || "data",
     frameGen: 0, frames: 0, fpsAt: 0, watch: null, pinned: null, layout: null, screenSeq: 0, layoutTimer: null, env: {},
-    hoverNode: null, lastPoll: 0, animDone: {}, menu: null
+    hoverNode: null, lastPoll: 0, animDone: {}, menu: null,
+    video: null, noVideo: {}, videoFails: {}, videoWaitUntil: 0,     // live video (src/device/stream.js)
+    fgApp: "", appManual: false, appLocked: false, appToast: ""     // "App" filled in from the phone
   };
 
   /* ---------- helpers ---------- */
@@ -56,7 +58,23 @@ var Rec = (function () {
   function lastIndex(p) { return +p.split(".").pop().replace("e", ""); }
   function walk(list, fn) { list.forEach(function (s) { fn(s); if (s.type === "block") { walk(s.steps, fn); walk(s.elseSteps || [], fn); } }); }
   function dataSteps() { var out = []; walk(S.steps, function (s) { if (s.type === "input" && s.mode === "data") out.push(s); }); return out; }
-  function addStep(step) { S.steps.push(step); renderSteps(); }
+  function addStep(step) {
+    S.steps.push(step);
+    // A step recorded inside the app shown in "App": that is this flow's app from now on
+    if (S.fgApp && S.fgApp === appId()) S.appLocked = true;
+    renderSteps();
+    // Keep the newest step in view (the list scrolls once it is full)
+    var box = $("recSteps");
+    if (box) { box.scrollTop = box.scrollHeight; var last = box.lastElementChild; if (last && last.scrollIntoView) last.scrollIntoView({ block: "nearest" }); }
+  }
+  /* "App" follows the app open on the phone (from the screen layout, see apps.js appFromNodes)
+     until the tester chooses one, or records a step inside it. */
+  function autoApp(pkg) {
+    S.fgApp = pkg || "";
+    if (!pkg || S.appManual || S.appLocked || appId() === pkg) return;
+    $("recApp").value = pkg; schedulePreview();
+    if (S.appToast !== pkg) { S.appToast = pkg; toast("App: " + pkg + " (open on the phone)"); }
+  }
 
   /* ======================= Devices ======================= */
   var WAIT_TEXT = {
@@ -254,7 +272,7 @@ var Rec = (function () {
       if (asStep) {
         addStep({ type: "openApp", appId: id, clearState: false, stopApp: false });
         api("/api/app/launch", { serial: S.serial, package: id, clearState: false }).catch(function (e) { toast(e.message, "err"); });
-      } else { $("recApp").value = id; schedulePreview(); }
+      } else { $("recApp").value = id; S.appManual = true; schedulePreview(); }
     }, q);
   }
 
@@ -340,7 +358,7 @@ var Rec = (function () {
       method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: file
     }).then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || "Could not add the APK"); return d; }); })
       .then(function (d) {
-        if (d.package) $("recApp").value = d.package;
+        if (d.package) { $("recApp").value = d.package; S.appManual = true; }
         toast("Added " + d.name + (d.package ? ". App ID: " + d.package : "") + ". Press Install.", "ok");
         return loadApks(d.name);
       })
@@ -354,7 +372,7 @@ var Rec = (function () {
     $("recInstall").disabled = true;
     toast("Installing " + name + "\u2026");
     api("/api/apk/install", { serial: S.serial, name: name }).then(function (d) {
-      if (d.package) $("recApp").value = d.package;
+      if (d.package) { $("recApp").value = d.package; S.appManual = true; }
       loadPackages(); schedulePreview();
       toast("Installed" + (d.package ? ". App ID: " + d.package : ". Pick the app ID from the list."), "ok");
     }).catch(function (e) { toast(e.message, "err"); })
@@ -420,7 +438,149 @@ var Rec = (function () {
     liveLabel("Connecting\u2026", "wait");
     frame(++S.frameGen);
   }
-  function stopStream() { S.streaming = false; S.frameGen++; liveLabel("Not connected", ""); }
+  function stopStream() {
+    S.streaming = false; S.frameGen++;
+    if (S.video) { S.video.stop(); S.video = null; }
+    liveLabel("Not connected", "");
+  }
+
+  /* ---------- Live video (2.0.1) ----------
+     One screenshot first (it gives the screen size and a picture right away), then the phone's
+     own H.264 video (src/device/stream.js), decoded by the browser (WebCodecs) and drawn frame by
+     frame: 20-60 frames per second instead of about 1. The phone only sends frames when something
+     moves, so a still screen shows "screen still". Anything that goes wrong falls back to screenshots. */
+  /* The phone picture as large as the window allows (2.0.1): full height of the free space,
+     width from the screen's own shape, so there are no wide empty bands around it. */
+  function fitPhone() {
+    var c = $("recScreen"), st = $("recStage");
+    if (!c || !st || !c.width || !c.height || $("tab-record").hidden) return;
+    var nav = document.querySelector("#tab-record .navbar");
+    for (var pass = 0; pass < 2; pass++) {             // a narrower phone can wrap the buttons below it: measure again
+      var top = st.getBoundingClientRect().top + (window.scrollY || 0);
+      var below = (nav ? nav.offsetHeight + 10 : 0) + 14;
+      var availH = Math.max(360, window.innerHeight - top - 40 - 34 - 16 - below);   // stage bar, hint, phone frame, buttons
+      var availW = Math.max(300, Math.min(window.innerWidth * 0.6, 760) - 24 - 16);
+      var h = Math.min(availH, availW * c.height / c.width);
+      c.style.height = Math.round(h) + "px";
+      c.style.width = Math.round(h * c.width / c.height) + "px";
+    }
+    drawAll();
+  }
+  function canVideo() {
+    return !!(window.VideoDecoder && window.EncodedVideoChunk && S.serial && S.dw && S.dh &&
+              !S.noVideo[S.serial] && Date.now() > S.videoWaitUntil);
+  }
+  function startVideo(gen) {
+    var serial = S.serial, ctrl = window.AbortController ? new AbortController() : null;
+    var dec = null, configured = false, gotKey = false, ts = 0, sps = null;
+    var buf = new Uint8Array(0), starts = [], scan = 0, au = [], auSlice = false, auKey = false, flushT = null;
+    var frames = 0, shown = false, done = false, t0 = Date.now();
+    var v = { stop: stop };
+    S.video = v;
+    function alive() { return !done && gen === S.frameGen && S.streaming && serial === S.serial; }
+    function stop() {
+      if (done) return; done = true;
+      clearTimeout(flushT); clearInterval(v.tick);
+      try { if (ctrl) ctrl.abort(); } catch (_) {}
+      try { if (dec && dec.state !== "closed") dec.close(); } catch (_) {}
+      if (S.video === v) S.video = null;
+    }
+    function backToShots(why, transient) {
+      var wasAlive = alive() || (!done && gen === S.frameGen && S.streaming);
+      stop();
+      if (transient) S.videoWaitUntil = Date.now() + 5000;
+      else {
+        S.videoFails[serial] = (S.videoFails[serial] || 0) + 1;
+        if (!shown || S.videoFails[serial] >= 3) S.noVideo[serial] = true;    // this device: screenshots from now on
+        if (window.console) console.log("Live video off (" + why + "), using screenshots");
+      }
+      if (wasAlive && gen === S.frameGen && S.streaming && serial === S.serial) frame(gen);
+    }
+    // ---- H.264 Annex-B: split into NAL units, group them into pictures ----
+    function feed(chunk) {
+      var b = new Uint8Array(buf.length + chunk.length); b.set(buf); b.set(chunk, buf.length); buf = b;
+      for (var i = scan; i + 2 < buf.length; i++) if (buf[i] === 0 && buf[i + 1] === 0 && buf[i + 2] === 1) { starts.push(i + 3); i += 2; }
+      scan = Math.max(scan, buf.length - 2);
+      if (starts.length < 2) return;
+      for (var k = 0; k + 1 < starts.length; k++) onNal(buf.subarray(starts[k], starts[k + 1] - 3));
+      var keep = starts[starts.length - 1] - 3;
+      buf = buf.slice(keep); scan = Math.max(0, scan - keep); starts = [3];
+    }
+    function flushTail() {                  // no more bytes for a moment: the last NAL is complete
+      if (starts.length === 1 && buf.length > 3) onNal(buf.subarray(3));
+      buf = new Uint8Array(0); starts = []; scan = 0;
+      emit();
+    }
+    function onNal(n) {
+      if (!n.length) return;
+      var t = n[0] & 31;
+      if (t === 7 || t === 8 || t === 6 || t === 9) { if (auSlice) emit(); if (t === 7) sps = n; au.push(n); return; }
+      if (t === 1 || t === 5) {
+        if (auSlice && n.length > 1 && (n[1] & 0x80)) emit();      // first slice of a new picture
+        au.push(n); auSlice = true; if (t === 5) auKey = true; return;
+      }
+      au.push(n);
+    }
+    function hex(x) { return (x < 16 ? "0" : "") + x.toString(16); }
+    function configure() {
+      dec = new VideoDecoder({ output: draw, error: function (e) { backToShots("decoder: " + (e && e.message)); } });
+      dec.configure({ codec: "avc1." + hex(sps[1]) + hex(sps[2]) + hex(sps[3]), optimizeForLatency: true });
+      configured = true;
+    }
+    function emit() {
+      if (!auSlice) return;                 // SPS / PPS wait for their picture
+      var key = auKey, parts = au; au = []; auSlice = false; auKey = false;
+      if (!alive()) return;
+      try {
+        if (key && !configured) { if (!sps) return; configure(); }
+        if (!configured || (!key && !gotKey)) return;
+        if (key) gotKey = true;
+        var len = 0; parts.forEach(function (p) { len += 4 + p.length; });
+        var data = new Uint8Array(len), o = 0;
+        parts.forEach(function (p) { data[o + 3] = 1; data.set(p, o + 4); o += 4 + p.length; });
+        dec.decode(new EncodedVideoChunk({ type: key ? "key" : "delta", timestamp: (ts += 16667), data: data }));
+      } catch (e) { backToShots("decode: " + e.message); }
+    }
+    function draw(f) {
+      if (!alive()) { f.close(); return; }
+      var c = $("recScreen");
+      if (c.width !== f.displayWidth || c.height !== f.displayHeight) { c.width = f.displayWidth; c.height = f.displayHeight; S.ctx = null; fitPhone(); }
+      S.ctx = S.ctx || c.getContext("2d");
+      S.ctx.drawImage(f, 0, 0, c.width, c.height);
+      f.close();
+      frames++; shown = true; S.streamErr = 0; S.videoFails[serial] = 0; setStage("live");
+    }
+    v.tick = setInterval(function () {
+      if (!alive()) return;
+      if (!shown && Date.now() - t0 > 6000) { backToShots("no picture in 6 s"); return; }
+      if (shown) liveLabel(frames ? "Live \u00b7 " + frames + " fps" : "Live \u00b7 screen still", "on");
+      frames = 0;
+      fetchLayout();
+    }, 1000);
+    var url = "/api/device/stream?serial=" + encodeURIComponent(serial) + "&dw=" + S.dw + "&dh=" + S.dh;
+    fetch(url, { cache: "no-store", signal: ctrl ? ctrl.signal : undefined }).then(function (r) {
+      if (!r.ok) return r.json().catch(function () { return {}; }).then(function (d) { var e = new Error(d.error || "No live video"); e.status = r.status; throw e; });
+      if (!r.body || !r.body.getReader) throw new Error("No stream reader");
+      var rd = r.body.getReader();
+      function pump() {
+        return rd.read().then(function (x) {
+          if (!alive()) { try { rd.cancel(); } catch (_) {} return; }
+          if (x.done) {                     // the phone's 3-minute limit, or a test started: open it again
+            var again = shown; stop();
+            if (gen === S.frameGen && S.streaming && serial === S.serial) { if (!again) S.noVideo[serial] = true; frame(gen); }
+            return;
+          }
+          feed(x.value);
+          clearTimeout(flushT); flushT = setTimeout(flushTail, 40);
+          return pump();
+        });
+      }
+      return pump();
+    }).catch(function (e) {
+      if (done) return;
+      backToShots(e.message, e.status === 409);
+    });
+  }
 
   function frame(gen) {
     if (gen !== S.frameGen || !S.streaming) return;
@@ -436,12 +596,14 @@ var Rec = (function () {
       .then(function (f) {
         if (serial !== S.serial) return;
         var c = $("recScreen");
-        if (c.width !== f.w || c.height !== f.h) { c.width = f.w; c.height = f.h; S.ctx = null; }
+        if (c.width !== f.w || c.height !== f.h) { c.width = f.w; c.height = f.h; S.ctx = null; fitPhone(); }
         S.ctx = S.ctx || c.getContext("2d");
         S.ctx.putImageData(new ImageData(new Uint8ClampedArray(f.buf), f.w, f.h), 0, 0);
         S.streamErr = 0; setStage("live");
         S.frames++;
-        if (Date.now() - S.fpsAt > 2000) { liveLabel("Connected \u00b7 " + (S.frames * 1000 / (Date.now() - S.fpsAt)).toFixed(1) + " fps", "on"); S.frames = 0; S.fpsAt = Date.now(); }
+        // Size known: switch to the live video when this PC and the phone can do it
+        if (canVideo()) { if (!S.video) startVideo(gen); return; }
+        if (Date.now() - S.fpsAt > 2000) { liveLabel("Screenshots \u00b7 " + (S.frames * 1000 / (Date.now() - S.fpsAt)).toFixed(1) + " fps", "on"); S.frames = 0; S.fpsAt = Date.now(); }
         // No change events from screenshots: look for a new layout now and then
         if (Date.now() - S.lastPoll > 1200) { S.lastPoll = Date.now(); fetchLayout(); }
         frame(gen);
@@ -462,6 +624,12 @@ var Rec = (function () {
       if (serial !== S.serial) return;
       if (d.seq) S.layout = { seq: d.seq, nodes: d.nodes };
       S.screenSeq = d.screenSeq;
+      if (d.app) autoApp(d.app);
+      // The phone was turned while the live video runs: start it again with the new screen size
+      if (S.video && d.nodes && d.nodes.length && S.dw) {
+        var mx = 0, my = 0; d.nodes.forEach(function (n) { if (n.b[2] > mx) mx = n.b[2]; if (n.b[3] > my) my = n.b[3]; });
+        if ((mx > my) !== (S.dw > S.dh) && Math.abs(mx - my) > 50) { S.video.stop(); frame(S.frameGen); }
+      }
       drawAll(); if (S.hoverAt) hoverAt(S.hoverAt.x, S.hoverAt.y);
     }).catch(function () {}).finally(function () { S.layoutBusy = false; });
   }
@@ -1605,7 +1773,7 @@ var Rec = (function () {
     if (!text.trim()) { S.steps = []; setDirty(false); renderSteps(); return Promise.resolve(true); }
     return api("/api/rec/parse", { yaml: text, steps: clean(S.steps) }).then(function (d) {
       S.steps = d.steps; S.picked = {};
-      if (d.appId) $("recApp").value = d.appId;
+      if (d.appId) { $("recApp").value = d.appId; S.appManual = true; }
       if (d.tags && d.tags.length) $("recTags").value = d.tags.filter(function (t) { return t !== "recorded"; }).join(", ");
       if (d.data) S.data = d.data;
       S.env = d.env || {};
@@ -1641,7 +1809,7 @@ var Rec = (function () {
   function clearAll() {
     if (!S.steps.length) return;
     modal({ title: "Clear all steps?", text: "This removes the recorded steps. Saved flows are not affected.", ok: "Clear steps" })
-      .then(function (v) { if (v) { S.steps = []; S.picked = {}; setDirty(false); renderSteps(); } });
+      .then(function (v) { if (v) { S.steps = []; S.picked = {}; S.appLocked = false; setDirty(false); renderSteps(); } });
   }
 
   /* ======================= Modes ======================= */
@@ -1678,6 +1846,8 @@ var Rec = (function () {
     $("recInspectOn").addEventListener("change", function () { if (!this.checked) onLeave(); });
     $("recApkFile").addEventListener("change", function () { uploadApk(this.files[0]); });
     ["recFlow", "recApp", "recTags"].forEach(function (id) { $(id).addEventListener("input", schedulePreview); });
+    // Typed by the tester: keep it (an empty field goes back to following the phone)
+    $("recApp").addEventListener("input", function () { S.appManual = !!appId(); });
     var ta = $("recYaml");
     ta.addEventListener("input", function () { setDirty(true); });
     ta.addEventListener("keydown", function (e) {
@@ -1697,11 +1867,12 @@ var Rec = (function () {
         e.preventDefault(); S.steps.pop(); renderSteps(); toast("Removed the last step.");
       }
     });
+    window.addEventListener("resize", function () { clearTimeout(S.fitT); S.fitT = setTimeout(fitPhone, 80); });
     document.addEventListener("visibilitychange", function () {
       if (!document.hidden && !$("tab-record").hidden && S.serial) startStream();
     });
     hooks.tab.push(function (name) {
-      if (name === "record") { refreshDevices(); loadApks($("recApk").value); }
+      if (name === "record") { refreshDevices(); loadApks($("recApk").value); setTimeout(fitPhone, 0); }
       else { stopStream(); closeMenu(); clearTimeout(S.watch); if (S.mode === "device") setMode("record"); }
     });
     setMode("record");

@@ -135,12 +135,12 @@ try { if (!sessionStorage.getItem("us.splash")) document.documentElement.classLi
         <div class="modehint" id="recModeHint"></div>
       </div>
       <div class="navbar" role="group" aria-label="Device buttons">
-        <button class="btn" onclick="Rec.nav('back')">Back</button>
-        <button class="btn" onclick="Rec.nav('home')">Home</button>
-        <button class="btn" onclick="Rec.nav('enter')">Enter</button>
-        <button class="btn" onclick="Rec.nav('hideKeyboard')">Hide keyboard</button>
-        <button class="btn" onclick="Rec.nav('scroll')">Scroll</button>
-        <button class="btn" onclick="Rec.nav('recents')">Recent apps</button>
+        <button class="btn" onclick="Rec.nav('back')" title="Back" aria-label="Back">&#9665; Back</button>
+        <button class="btn" onclick="Rec.nav('home')" title="Home" aria-label="Home">&#9675; Home</button>
+        <button class="btn" onclick="Rec.nav('recents')" title="Recent apps" aria-label="Recent apps">&#9634;</button>
+        <button class="btn" onclick="Rec.nav('enter')" title="Enter">Enter</button>
+        <button class="btn" onclick="Rec.nav('hideKeyboard')" title="Hide keyboard" aria-label="Hide keyboard">&#9000;&#8595;</button>
+        <button class="btn" onclick="Rec.nav('scroll')" title="Scroll">Scroll</button>
         <button class="btn" onclick="Rec.typeAny()" title="Type into the field that has focus on the phone">Type&hellip;</button>
       </div>
     </div>

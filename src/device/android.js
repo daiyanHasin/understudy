@@ -11,6 +11,7 @@
  *   layout.js        elements on screen (uiautomator), cached per screen change
  *   input.js         tap, swipe, keys, text; screen size, touch device, keyboard
  *   apps.js          installed apps, app in front, launch, open link, install APK
+ *   stream.js        live screen video for the Record tab (not in this index: routes use it directly)
  */
 const adb     = require("./adb");
 const emu     = require("./emulator");
@@ -44,5 +45,6 @@ module.exports = {
   screenSize: input.screenSize, touchDevice: input.touchDevice, keyboardArea: input.keyboardArea,
   // apps.js
   packages: apps.packages, apps: apps.apps, foreground: apps.foreground, launch: apps.launch,
+  appInFront: apps.appInFront,
   openLink: apps.openLink, apkPackage: apps.apkPackage, install: apps.install
 };

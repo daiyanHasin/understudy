@@ -43,6 +43,45 @@ async function foreground(serial) {
   } catch (_) {}
   return "";
 }
+/* ---------- The app being used, from the screen layout (2.0.1) ----------
+ * The Record tab fills in "App" by itself with the app the tester opens on the phone.
+ * The layout is read anyway (hover outlines), so no extra command runs on the phone: the
+ * app is the package of the top application window, ignoring the home screen, the status
+ * bar / notification shade, the keyboard and permission dialogs (which sit on top of the app).
+ */
+const homeCache = new Map();          // serial -> home screen (launcher) package
+async function homePackage(serial) {
+  checkSerial(serial);
+  if (homeCache.has(serial)) return homeCache.get(serial);
+  let pkg = "";
+  try {
+    const out = await shell(serial, ["cmd", "package", "resolve-activity", "--brief", "-a", "android.intent.action.MAIN",
+                                     "-c", "android.intent.category.HOME"], { timeout: 8000 });
+    const m = out.match(/^\s*([A-Za-z][\w.]*)\/[\w.$]+\s*$/m) || out.match(/packageName=([A-Za-z][\w.]*)/);
+    if (m && PKG_RE.test(m[1])) pkg = m[1];
+  } catch (_) {}
+  homeCache.set(serial, pkg);
+  return pkg;
+}
+const NOT_THE_APP = /^(android|com\.android\.systemui|com\.android\.(permissioncontroller|packageinstaller)|com\.google\.android\.(permissioncontroller|packageinstaller|inputmethod\.\w+)|com\.samsung\.android\.honeyboard|com\.sec\.android\.inputmethod|com\.touchtype\.swiftkey|com\.android\.inputmethod\.\w+)$/;
+function appFromNodes(nodes, home) {
+  const byWin = new Map();
+  (nodes || []).forEach(n => {
+    if (!n.pkg || !PKG_RE.test(n.pkg) || NOT_THE_APP.test(n.pkg) || n.pkg === home) return;
+    if (/INPUT_METHOD|SYSTEM|ACCESSIBILITY|MAGNIFICATION/.test(n.wtype || "")) return;
+    const w = n.win || 0;
+    if (!byWin.has(w)) byWin.set(w, { layer: n.layer || 0, pkg: n.pkg, area: 0 });
+    const e = byWin.get(w);
+    if (e.pkg === n.pkg) e.area = Math.max(e.area, (n.x2 - n.x1) * (n.y2 - n.y1));
+  });
+  // Top window first; a tiny window (a toast, a bubble) does not count as the app
+  const list = Array.from(byWin.values()).filter(e => e.area > 40000).sort((a, b) => b.layer - a.layer || b.area - a.area);
+  return list.length ? list[0].pkg : "";
+}
+async function appInFront(serial, nodes) {
+  return appFromNodes(nodes, await homePackage(serial).catch(() => ""));
+}
+
 /* ---------- APKs ---------- */
 async function apkPackage(file) {
   const aapt = aaptPath();
@@ -82,5 +121,5 @@ async function openLink(serial, url) {
 }
 
 module.exports = {
-  packages, apps, foreground, apkPackage, install, launch, openLink
+  packages, apps, foreground, apkPackage, install, launch, openLink, homePackage, appFromNodes, appInFront
 };

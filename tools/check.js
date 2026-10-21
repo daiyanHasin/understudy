@@ -159,6 +159,27 @@ const rel = p => path.relative(ROOT, p).split(path.sep).join("/");
     assert.strictEqual(back.steps[0].sel.kind, "rel");
     assert.strictEqual(recorder.buildYaml(Object.assign({ flow: "t.yaml" }, back)).yaml, y, "changed after a round trip");
   });
+  await test("the app open on the phone is found from the layout (not the home screen, keyboard or status bar)", () => {
+    const apps = require("../src/device/apps");
+    const N = (o) => Object.assign({ x1: 0, y1: 0, x2: 1080, y2: 2400, layer: 0, wtype: "" }, o);
+    const nodes = [
+      N({ pkg: "com.android.systemui", win: 1, layer: 3, wtype: "TYPE_SYSTEM", y2: 80 }),
+      N({ pkg: "com.google.android.inputmethod.latin", win: 2, layer: 2, wtype: "TYPE_INPUT_METHOD", y1: 1500 }),
+      N({ pkg: "com.shop.app", win: 3, layer: 1, wtype: "TYPE_APPLICATION" }),
+      N({ pkg: "com.sec.android.app.launcher", win: 4, layer: 0, wtype: "TYPE_APPLICATION" })];
+    assert.strictEqual(apps.appFromNodes(nodes, "com.sec.android.app.launcher"), "com.shop.app");
+    assert.strictEqual(apps.appFromNodes(nodes.filter(n => n.pkg !== "com.shop.app"), "com.sec.android.app.launcher"), "");
+  });
+  await test("live video: picture size and changed-picture counting", () => {
+    const stream = require("../src/device/stream");
+    assert.deepStrictEqual(stream.videoSize(1080, 2400), { w: 720, h: 1600 });
+    assert.deepStrictEqual(stream.videoSize(2400, 1080), { w: 1600, h: 720 });
+    const c = stream.sliceCounter();
+    // SPS (7), IDR slice (5, not counted), then a 10-byte P slice (1) split over two chunks
+    c.feed(Buffer.from([0, 0, 0, 1, 0x67, 9, 9, 0, 0, 1, 0x65, 8, 8, 8, 0, 0, 1, 0x41, 1, 2, 3]));
+    c.feed(Buffer.from([4, 5, 6, 7, 8, 9, 10]));
+    assert.strictEqual(c.take(), 10);
+  });
   await test("YAML editor keeps steps it understands and unknown commands word for word", async () => {
     const y = "appId: a.b\n---\n- launchApp\n- tapOn: \"Hi\"\n- someFutureCommand:\n    foo: bar\n";
     const r = await recorder.parseYaml(y, []);

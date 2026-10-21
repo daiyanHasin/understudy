@@ -54,6 +54,9 @@ function markChange(serial) {
   s.inputAt = Date.now();          // a read-ahead frame taken before this is out of date
 }
 
+/** The live video (stream.js) saw the picture change. Not an input: read-ahead frames stay valid. */
+function streamChange(serial) { bump(stateOf(serial)); }
+
 function screenInfo(serial) {
   const s = devState.get(serial);
   if (!s) return { seq: 0, still: false, layoutSeq: 0 };
@@ -182,6 +185,6 @@ function frameMode(serial) {
 }
 
 module.exports = {
-  TARGET_W, devState, stateOf, forget, forgetAll, markChange, screenInfo,
+  TARGET_W, devState, stateOf, forget, forgetAll, markChange, streamChange, screenInfo,
   frame, decodeRaw, frameMode
 };
