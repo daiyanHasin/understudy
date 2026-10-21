@@ -14,12 +14,22 @@ const screen = require("./screen");
 const forget = serial => screen.forget(serial);
 const SNAPSHOT = "understudy_clean";
 
-async function avds() {
-  try {
-    const { stdout } = await run(emulator(), ["-list-avds"], { timeout: 15000 });
-    return String(stdout).split(/\r?\n/).map(s => s.trim()).filter(s => AVD_RE.test(s));
-  } catch (_) { return []; }
+/* `emulator -list-avds` starts emulator.exe (about 0.5-1.5 s on Windows) and was run on
+   every device-list poll (every 1.5-2.5 s). The list only changes when a virtual device is
+   installed, so it is kept for AVD_TTL and shared between callers. */
+const AVD_TTL = 30000;
+let avdCache = null, avdInflight = null;
+function avds() {
+  if (avdCache && Date.now() - avdCache.at < AVD_TTL) return Promise.resolve(avdCache.list.slice());
+  if (avdInflight) return avdInflight.then(l => l.slice());
+  avdInflight = run(emulator(), ["-list-avds"], { timeout: 15000 })
+    .then(({ stdout }) => String(stdout).split(/\r?\n/).map(s => s.trim()).filter(s => AVD_RE.test(s)))
+    .catch(() => [])
+    .then(list => { avdCache = { at: Date.now(), list }; return list; })
+    .finally(() => { avdInflight = null; });
+  return avdInflight.then(l => l.slice());
 }
+function forgetAvds() { avdCache = null; }
 
 /* ---------- Virtual devices ---------- */
 const emuState = new Map();   // avd -> { started, exited, code, log }
@@ -179,5 +189,5 @@ async function snapshot(serial, action) {
 }
 
 module.exports = {
-  avds, startAvd, avdProblem, stopDevice, snapshot, processes, endProcesses
+  avds, forgetAvds, startAvd, avdProblem, stopDevice, snapshot, processes, endProcesses
 };

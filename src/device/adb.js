@@ -108,7 +108,24 @@ function shell(serial, args, opts) {
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 /* ---------- Devices ---------- */
-async function devices() {
+/*
+ * devices() is polled by several screens at once (Record tab every 2.5 s, Add device every
+ * 1.5 s, the Wi-Fi connect loop every 0.5 s). Before 2.0.1 every call started its own
+ * `adb devices -l` plus one `getprop` per device plus `emu avd name` per emulator. Polls
+ * overlapped (a Wi-Fi phone's getprop can take up to 5 s), so adb had a queue of commands
+ * in front of every screenshot and every `adb pair` / `adb connect`.
+ * Now:
+ *   - callers that ask while a read is running share that read (no pile-up)
+ *   - a result younger than LIST_TTL is reused
+ *   - "booted" and the AVD name are remembered per serial; only devices not yet booted
+ *     are asked again. Forgotten as soon as the serial leaves the list.
+ */
+const LIST_TTL = 700;
+let listInflight = null, listLast = null;
+const bootedSeen = new Set();          // serials that reported sys.boot_completed=1
+const avdNames   = new Map();          // emulator serial -> AVD name
+
+async function readDevices() {
   const { stdout } = await run(adb(), ["devices", "-l"], { timeout: 10000 });
   const list = [];
   for (const line of String(stdout).split(/\r?\n/).slice(1)) {
@@ -121,17 +138,47 @@ async function devices() {
     list.push({ serial: m[1], state: st, model: model.replace(/_/g, " "),
                 emulator: m[1].startsWith("emulator-"), wifi: isWifi(m[1]), booted: false });
   }
+  // Forget what we knew about devices that are gone or not ready (a rebooted phone boots again)
+  const ready = new Set(list.filter(d => d.state === "device").map(d => d.serial));
+  for (const s of Array.from(bootedSeen)) if (!ready.has(s)) bootedSeen.delete(s);
+  for (const s of Array.from(avdNames.keys())) if (!ready.has(s)) avdNames.delete(s);
+
   await Promise.all(list.filter(d => d.state === "device").map(async d => {
-    try { d.booted = (await shell(d.serial, ["getprop", "sys.boot_completed"], { timeout: 5000 })).trim() === "1"; }
-    catch (_) {}
+    if (bootedSeen.has(d.serial)) d.booted = true;
+    else {
+      try { d.booted = (await shell(d.serial, ["getprop", "sys.boot_completed"], { timeout: 5000 })).trim() === "1"; }
+      catch (_) {}
+      if (d.booted) bootedSeen.add(d.serial);
+    }
     if (d.emulator) {
-      try {
-        const { stdout } = await run(adb(), ["-s", d.serial, "emu", "avd", "name"], { timeout: 5000 });
-        d.avd = String(stdout).split(/\r?\n/)[0].trim();
-      } catch (_) {}
+      if (avdNames.has(d.serial)) d.avd = avdNames.get(d.serial);
+      else {
+        try {
+          const { stdout } = await run(adb(), ["-s", d.serial, "emu", "avd", "name"], { timeout: 5000 });
+          d.avd = String(stdout).split(/\r?\n/)[0].trim();
+          if (d.avd) avdNames.set(d.serial, d.avd);
+        } catch (_) {}
+      }
     }
   }));
   return list;
+}
+
+/** Devices adb reports, with boot state. opts.fresh skips the short cache (still shares a running read). */
+function devices(opts) {
+  const fresh = !!(opts && opts.fresh);
+  if (!fresh && listLast && Date.now() - listLast.at < LIST_TTL) return Promise.resolve(copyList(listLast.list));
+  if (listInflight) return listInflight.then(copyList);
+  listInflight = readDevices()
+    .then(list => { listLast = { at: Date.now(), list }; return list; })
+    .finally(() => { listInflight = null; });
+  return listInflight.then(copyList);
+}
+const copyList = l => l.map(d => Object.assign({}, d));
+/** Drop cached device facts (after connect / disconnect / stop, so the next list is read anew). */
+function forgetDevices(serial) {
+  listLast = null;
+  if (serial) { bootedSeen.delete(serial); avdNames.delete(serial); }
 }
 
 function isWifi(serial) { return serial.includes(":") || /\._adb-tls-connect\._tcp/.test(serial); }
@@ -140,5 +187,5 @@ module.exports = {
   WIN, SERIAL_RE, AVD_RE, PKG_RE, ADDR_RE, LOCAL_TOOLS,
   sdkRoot, tool, adb, emulator, adbSource, aaptPath,
   run, shell, shQuote, sleep, checkSerial, checkPkg, int,
-  devices, isWifi
+  devices, forgetDevices, isWifi
 };

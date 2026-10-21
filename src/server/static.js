@@ -9,6 +9,7 @@ const fs   = require("fs");
 const path = require("path");
 const security = require("../core/security");
 const P        = require("../core/paths");
+const report   = require("../reports/report");
 
 const APP_DIR = P.APP_DIR;
 
@@ -61,6 +62,15 @@ function serveReport(req, res, p) {
   if (!filePath.startsWith(REPORTS_DIR + path.sep)) { res.writeHead(403); return res.end(); }
   fs.readFile(filePath, (err, data) => {
     if (err) { res.writeHead(404); return res.end("Not found"); }
+    // Maestro reports written before 2.0.1 still load Bootstrap from the internet, which the
+    // report frame refuses (and an offline PC can't reach): fix the file once, on first open.
+    if (/\.html?$/i.test(filePath) && data.includes("cdn.jsdelivr.net/npm/bootstrap")) {
+      try {
+        const fixed = report.fixMaestroHtml(data.toString("utf8"));
+        data = Buffer.from(fixed, "utf8");
+        fs.writeFile(filePath, data, () => {});
+      } catch (_) {}
+    }
     const types = { ".html": "text/html; charset=utf-8", ".png": "image/png", ".jpg": "image/jpeg",
                     ".css": "text/css", ".js": "application/javascript", ".json": "application/json" };
     res.writeHead(200, security.headers.report(types[path.extname(filePath).toLowerCase()] || "application/octet-stream"));

@@ -3,20 +3,29 @@
  * Phones over Wi-Fi: pair (6-digit code), connect (IP:port), usbToWifi (one click
  * from a USB phone). Plain-language reasons for failures come from wifi.js.
  */
-const { ADDR_RE, adb, run, shell, checkSerial, sleep, devices, isWifi } = require("./adb");
+const { ADDR_RE, adb, run, shell, checkSerial, sleep, devices, forgetDevices, isWifi } = require("./adb");
 const wifi = require("./wifi");
 
 /* ---------- Phones over Wi-Fi (Android 11+ wireless debugging) ---------- */
 async function pair(address, code) {
   if (!ADDR_RE.test(String(address || ""))) throw new Error("Enter the pairing address as IP:port");
   if (!/^\d{6}$/.test(String(code || ""))) throw new Error("The pairing code has 6 digits");
-  // Reachable at all? Answers in 3 s instead of adb's long silent wait.
-  const pre = await wifi.diagnose(address, "pair");
-  if (!pre.ok) throw new Error(pre.message);
+  // No TCP probe BEFORE pairing (2.0.1). The phone's pairing service expects exactly one
+  // client: an empty connection that opens and closes counts as a failed attempt on many
+  // phones, the "Pair with code" window closes and the real `adb pair` that follows is
+  // refused ("sometimes it won't connect"). The probe now runs only after a failure, to
+  // explain it - the same order the QR-code path (pairing.js) already used.
   let out = "";
   try { out = String((await run(adb(), ["pair", address, code], { timeout: 30000 })).stdout); }
   catch (e) { out = e.message; }
-  if (!/success/i.test(out)) throw new Error(wifi.explainAdb(out, "pair") || out.trim() || "Pairing failed");
+  if (!/success/i.test(out)) {
+    const why = wifi.explainAdb(out, "pair");
+    if (!why) {
+      const d = await wifi.diagnose(address, "pair");
+      if (!d.ok) throw new Error(d.message);
+    }
+    throw new Error(why || out.trim() || "Pairing failed");
+  }
   return { ok: true, ip: wifi.split(address).host };
 }
 /* USB phone -> Wi-Fi with one click (works on every Android version):
@@ -77,8 +86,9 @@ async function connect(address) {
   catch (e) { t = e.message; }
   if (!/connected to/i.test(t) || /fail|unable|cannot/i.test(t)) throw new Error(wifi.explainAdb(t, "connect") || t || "Could not connect");
   // Connected is not the same as allowed: wait a moment for the phone's answer
+  forgetDevices(address);
   for (let i = 0; i < 8; i++) {
-    const d = (await devices().catch(() => [])).find(x => x.serial === address);
+    const d = (await devices({ fresh: true }).catch(() => [])).find(x => x.serial === address);
     if (d && d.state === "device") return { ok: true, address };
     if (d && d.state === "unauthorized" && i >= 3) {
       throw new Error("Connected, but the phone has not allowed this PC. Unlock the phone and tap Allow, or pair it first (QR code or 6-digit code).");

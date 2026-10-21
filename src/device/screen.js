@@ -151,7 +151,12 @@ function frame(serial, opts) {
   if (s.frameInflight) return s.frameInflight;
   const a = s.ahead; s.ahead = null;
   const usable = a && a.startedAt >= s.inputAt && Date.now() - a.startedAt < AHEAD_MAX;
-  const source = usable ? a.promise : grab(serial, s);
+  // An out-of-date read-ahead (taken before a tap) may still be running on the phone.
+  // Wait for it instead of starting a second screencap next to it: two at once share the
+  // phone's CPU and the USB / Wi-Fi link, so both arrive late (2.0.1).
+  const source = usable ? a.promise
+               : a ? a.promise.then(() => grab(serial, s), () => grab(serial, s))
+               : grab(serial, s);
   s.frameInflight = source
     .then(raw => {
       readAhead(serial, s);                             // next screenshot starts now

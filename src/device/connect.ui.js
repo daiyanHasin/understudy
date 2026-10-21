@@ -72,8 +72,10 @@ var Connect = (function () {
 
   /* ---------- Device list ---------- */
   function poll() {
-    if (!C.open) return;
-    api("/api/device/list").then(function (d) {
+    // One list request at a time: the interval is 1.5 s, a slow Wi-Fi phone can make one take longer (2.0.1)
+    if (!C.open || C.polling) return;
+    C.polling = true;
+    api("/api/device/list").finally(function () { C.polling = false; }).then(function (d) {
       if (!C.open) return;
       C.last = d;
       $("cdTools").hidden = !(d.adb && d.adb.ok === false);

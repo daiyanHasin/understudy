@@ -100,7 +100,33 @@ function runSetup() {
   });
 }
 
-function runMaestro(job, reportPath, debugDir) {
+/*
+ * Why a test took 2-3 minutes to start (fixed in 2.0.1):
+ *   1. By default every `maestro test` UNINSTALLS and REINSTALLS Maestro's two helper apps
+ *      on the phone (maestro-app.apk + maestro-server.apk). One call per job, and a job is
+ *      one Excel row, so 10 rows = 10 reinstalls. Each install is slow over Wi-Fi, and
+ *      Google Play Protect may scan each one ("Scan app?"). Now the helpers are refreshed
+ *      once per device per Understudy session (so a Maestro update still lands), and later
+ *      jobs pass --no-reinstall-driver. Maestro versions without that option are detected
+ *      ("Unknown option") and the job is simply run again without it.
+ *   2. Maestro's update check and anonymous analytics call the internet at start-up.
+ *      Behind a company proxy (Netskope / Zscaler) those calls wait for a timeout.
+ *      Both are switched off with Maestro's own environment variables.
+ *   3. Maestro was started with an open, never-written input: any question it asks on
+ *      the console (first run, choose a device) waited forever. Input is now closed, so
+ *      a question gets an immediate "no answer" instead of a hang.
+ * Each job also logs how long Maestro took until its first step, to see where time goes.
+ */
+const MAESTRO_ENV = {
+  MAESTRO_CLI_NO_ANALYTICS: "1",
+  MAESTRO_DISABLE_UPDATE_CHECK: "true",
+  MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: "true"
+};
+const driverFresh = new Set();        // devices whose Maestro helper apps were reinstalled this session
+let noReinstallFlag = true;           // false once Maestro said it doesn't know --no-reinstall-driver
+
+function runMaestro(job, reportPath, debugDir, opts) {
+  opts = opts || {};
   return new Promise(resolve => {
     let envArgs = "";
     for (const k of Object.keys(job.env || {})) {
@@ -109,27 +135,53 @@ function runMaestro(job, reportPath, debugDir) {
     }
     // --device picks the phone/emulator chosen in Understudy when several are connected
     const dev = job.device && SERIAL_RE.test(job.device) ? ' --device "' + job.device + '"' : "";
+    const devKey = job.device || "(default)";
+    const skipReinstall = noReinstallFlag && !opts.reinstall && driverFresh.has(devKey);
     const cmd = "maestro" + dev + ' test "Flows/' + (job.runPath || job.flow) + '" --format html-detailed --output "' +
-                reportPath + '" --debug-output "' + debugDir + '"' + envArgs;
+                reportPath + '" --debug-output "' + debugDir + '"' + (skipReinstall ? " --no-reinstall-driver" : "") + envArgs;
     broadcast("$ " + cmd + "\n");
+
+    const t0 = Date.now();
+    let firstStep = false, tailText = "";
+    const keep = t => { tailText = (tailText + t).slice(-8000); };
 
     // Live steps from maestro.log -> UI step list + readable console lines
     const icons = { RUNNING: "\u25B6", COMPLETED: "\u2713", FAILED: "\u2717", SKIPPED: "\u21B7", WARNED: "!" };
     const tailer = live.tail(debugDir, st => {
       if (st.flow) { broadcast("  > Flow " + st.flow + "\n"); return; }
+      if (!firstStep) {
+        firstStep = true;
+        broadcast("  [time] Maestro needed " + ((Date.now() - t0) / 1000).toFixed(1) + " s to start (JVM, device, helper apps)\n");
+      }
       emit({ type: "step", id: job.id, desc: st.desc, status: st.status, ts: st.ts });
       recordStep(job, st);
       if (st.status === "FAILED" && !job.failedStep) job.failedStep = st.desc;   // innermost failure
       if (st.status !== "RUNNING") broadcast("  " + icons[st.status] + " " + st.desc + "  " + st.status + "\n");
     });
 
-    const child = spawn(cmd, { cwd: P.root, shell: true, windowsHide: true });
+    const child = spawn(cmd, {
+      cwd: P.root, shell: true, windowsHide: true,
+      env: Object.assign({}, process.env, MAESTRO_ENV),
+      stdio: ["ignore", "pipe", "pipe"]          // no console questions that wait forever
+    });
     state.currentChild = child;
     if (state.stopRequested) killTree(child);
-    child.stdout.on("data", d => broadcast(d.toString()));
-    child.stderr.on("data", d => broadcast(d.toString()));
+    child.stdout.on("data", d => { const t = d.toString(); keep(t); broadcast(t); });
+    child.stderr.on("data", d => { const t = d.toString(); keep(t); broadcast(t); });
     child.on("error", e => { tailer.stop(); broadcast("[ERROR] " + e.message + "\n"); resolve(1); });
-    child.on("close", code => { tailer.stop(); state.currentChild = null; resolve(code); });
+    child.on("close", code => {
+      tailer.stop(); state.currentChild = null;
+      // Older Maestro: no --no-reinstall-driver. Remember that and run this job again without it.
+      if (code !== 0 && skipReinstall && /Unknown option[^\n]*reinstall-driver/i.test(tailText) && !state.stopRequested) {
+        noReinstallFlag = false;
+        broadcast("[INFO] This Maestro version always reinstalls its helper apps (update Maestro to start tests faster). Running again.\n");
+        return resolve(runMaestro(job, reportPath, debugDir, opts));
+      }
+      // Helper apps were (re)installed by this call: later jobs on this device can skip that
+      if (!skipReinstall && firstStep) driverFresh.add(devKey);
+      broadcast("  [time] This test took " + ((Date.now() - t0) / 1000).toFixed(1) + " s in total\n");
+      resolve(code);
+    });
   });
 }
 
@@ -207,6 +259,8 @@ async function runFlows(jobs, stopOnFail, meta) {
       let code;
       try { code = await runMaestro(job, reportPath, debugDir); }
       finally { if (tmp) partial.remove(tmp.full); }
+      // Maestro's own report needs Bootstrap from the internet: make it self-contained (report.js)
+      try { report.fixMaestroReport(reportPath); } catch (_) {}
       const stopped = state.stopRequested;
       let shot = code !== 0 ? live.failureScreenshot(debugDir) : null;
       // .runs/ is cleared by the next run: keep failure screenshots with the reports
@@ -256,6 +310,8 @@ async function runFlows(jobs, stopOnFail, meta) {
     };
     try { run.summary = report.write(run); broadcast("[REPORT] Reports/" + run.summary + "\n"); }
     catch (e) { broadcast("[WARN] Could not write the run report: " + e.message + "\n"); }
+    // Older Maestro reports in Reports/ (from before 2.0.1) get the same offline styling
+    setImmediate(() => { try { report.fixAllMaestroReports(); } catch (_) {} });
     try { history.add(run); }
     catch (e) { broadcast("[WARN] Could not save run history: " + e.message + "\n"); }
     emit({ type: "done", ok: results.every(r => r.ok), passed, failed, skipped, results, runId: run.id, summary: run.summary || null });

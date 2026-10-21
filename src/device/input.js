@@ -9,26 +9,34 @@ const { markChange } = require("./screen");
 
 /* ---------- Input ---------- */
 const KEYS = { back: 4, home: 3, enter: 66, tab: 61, del: 67, recents: 187, power: 26 };
-function tap(serial, x, y) {
+/*
+ * `adb shell input ...` takes 0.3-1.5 s on the phone (it starts a small Java program).
+ * Before 2.0.1 the screen was marked "changed" only BEFORE the command, so screenshots
+ * taken while the command was still starting counted as "after the tap": the window kept
+ * showing the old screen, and a layout of the OLD screen could be cached as current.
+ * Now the change is marked before AND after the command has finished (changed()).
+ */
+function changed(serial, p) {
   markChange(serial);
-  return shell(serial, ["input", "tap", String(int(x, 0, 20000, "x")), String(int(y, 0, 20000, "y"))]);
+  return p.then(r => { markChange(serial); return r; }, e => { markChange(serial); throw e; });
+}
+function tap(serial, x, y) {
+  const X = String(int(x, 0, 20000, "x")), Y = String(int(y, 0, 20000, "y"));
+  return changed(serial, shell(serial, ["input", "tap", X, Y]));
 }
 function longPress(serial, x, y) {
   const X = String(int(x, 0, 20000, "x")), Y = String(int(y, 0, 20000, "y"));
-  markChange(serial);
-  return shell(serial, ["input", "swipe", X, Y, X, Y, "800"]);
+  return changed(serial, shell(serial, ["input", "swipe", X, Y, X, Y, "800"]));
 }
 function swipe(serial, x1, y1, x2, y2, ms) {
-  markChange(serial);
-  return shell(serial, ["input", "swipe",
-    String(int(x1, 0, 20000, "x")), String(int(y1, 0, 20000, "y")),
-    String(int(x2, 0, 20000, "x")), String(int(y2, 0, 20000, "y")),
-    String(int(ms || 300, 50, 5000, "duration"))]);
+  const a = [String(int(x1, 0, 20000, "x")), String(int(y1, 0, 20000, "y")),
+             String(int(x2, 0, 20000, "x")), String(int(y2, 0, 20000, "y")),
+             String(int(ms || 300, 50, 5000, "duration"))];
+  return changed(serial, shell(serial, ["input", "swipe"].concat(a)));
 }
 function key(serial, name) {
   if (!(name in KEYS)) throw new Error("Unknown key");
-  markChange(serial);
-  return shell(serial, ["input", "keyevent", String(KEYS[name])]);
+  return changed(serial, shell(serial, ["input", "keyevent", String(KEYS[name])]));
 }
 async function keyboardShown(serial) {
   return /mInputShown=true/.test(await shell(serial, ["dumpsys", "input_method"], { timeout: 8000 }));
@@ -36,11 +44,12 @@ async function keyboardShown(serial) {
 async function hideKeyboard(serial) { if (await keyboardShown(serial)) await key(serial, "back"); }
 function erase(serial, n) {
   const count = int(n || 50, 1, 200, "count");
-  return shell(serial, ["input", "keyevent", "123"].concat(new Array(count).fill("67")));
+  return changed(serial, shell(serial, ["input", "keyevent", "123"].concat(new Array(count).fill("67"))));
 }
 
 const ADB_IME = "com.android.adbkeyboard/.AdbIME";
-async function text(serial, value) {
+function text(serial, value) { return changed(serial, typeText(serial, value)); }
+async function typeText(serial, value) {
   const s = String(value == null ? "" : value);
   if (!s.length) return;
   if (s.length > 1000) throw new Error("Text is too long (1000 characters max)");
