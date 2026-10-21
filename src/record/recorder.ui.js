@@ -655,8 +655,14 @@ var Rec = (function () {
       if (shown) {
         // Pictures handed to the decoder but not shown yet: should be 0-1 (shown on hover)
         var behind = Math.max(0, sent - drawn);
-        liveLabel(frames ? "Live " + frames + " fps" : "Live, still", "on");
-        $("recLive").title = "Live video from the phone. Pictures waiting in the decoder: " + behind;
+        // The phone only sends a picture when something on its screen changes, so the count is
+        // "pictures that had something new", not smoothness: 1-3 = a clock or cursor ticking.
+        // Show the rate only while the screen really moves (averaged over 2 s so it doesn't jump).
+        v.hist = (v.hist || []).concat(frames).slice(-2);
+        var avg = Math.round(v.hist.reduce(function (a, b) { return a + b; }, 0) / v.hist.length);
+        liveLabel(frames >= 5 ? "Live " + avg + " fps" : "Live", "on");
+        $("recLive").title = "Live video from the phone. It sends a new picture only when its screen changes, so a still screen shows no fps." +
+          " Pictures waiting in the decoder: " + behind;
       }
       frames = 0;
       fetchLayout();
