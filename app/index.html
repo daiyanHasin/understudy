@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<!-- Understudy - Copyright (c) 2026 Hasin Md. Daiyan. All rights reserved. See LICENSE. -->
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="us-token" content="__US_TOKEN__">
+<meta name="theme-color" content="#f5f5f2">
+<title>Understudy</title>
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<script>/* Restore the sidebar state before the first paint (no flicker) */
+try { if (localStorage.getItem("us.side") === "collapsed") document.documentElement.classList.add("side-collapsed"); } catch (e) {}
+try { if (!sessionStorage.getItem("us.splash")) document.documentElement.classList.add("splashing"); } catch (e) {}</script>
+<div id="splash" class="splash" aria-hidden="true">
+  <div class="splash-mark"><img src="assets/logo.svg" alt="" width="84" height="84"><b>Understudy</b><span>Show it once. It performs a thousand times.</span></div>
+</div>
+<div id="toasts"></div>
+
+<aside class="side" aria-label="Main">
+  <div class="sbrand">
+    <img class="mark" src="assets/logo.svg" alt="" width="30" height="30">
+    <div class="logo" id="brandLogo" hidden></div>
+    <div class="sname"><h1 id="brandName">Understudy</h1><span id="brandTag" class="stag"></span></div>
+    <button class="sidetoggle" id="sideToggle" onclick="Shell.toggleSide()" title="Hide the sidebar (Ctrl+B)" aria-label="Hide or show the sidebar">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/></svg></button>
+  </div>
+  <div class="projbox">
+    <button class="projbtn" id="projBtn" onclick="Projects.toggle()" aria-haspopup="true" title="Switch project">
+      <span class="pdot" aria-hidden="true"></span><span class="pinfo"><small>Project</small><b id="projName">&hellip;</b></span><span class="pchev" aria-hidden="true">&#9662;</span>
+    </button>
+    <div class="projpop" id="projPop" hidden></div>
+  </div>
+  <nav class="snav">
+    <button class="tab"        id="tabbtn-record" onclick="showTab('record')"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3" class="fill"/></svg><span>Record</span></button>
+    <button class="tab active" id="tabbtn-run"    onclick="showTab('run')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l11 7-11 7z"/></svg><span>Run flows</span></button>
+    <button class="tab"        id="tabbtn-data"   onclick="showTab('data')"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 10h16M10 10v9"/></svg><span>Test data</span></button>
+    <button class="tab"        id="tabbtn-editor" onclick="showTab('editor')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h7l4 4v12H7z"/><path d="M14 4v4h4M10 13l-2 2 2 2M14 13l2 2-2 2"/></svg><span>Flow files</span></button>
+    <button class="tab"        id="tabbtn-reports" onclick="showTab('reports')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h9l3.5 3.5v13.5H6z"/><path d="M9 12h6M9 15.5h6M9 8.5h3"/></svg><span>Reports</span></button>
+    <button class="tab"        id="tabbtn-dashboard" onclick="showTab('dashboard')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V11M10 19V6M15 19v-5M20 19V9"/></svg><span>Dashboard</span></button>
+    <div class="ssep"></div>
+    <button class="tab"        id="tabbtn-setup"  onclick="showTab('setup')"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg><span>Setup</span></button>
+  </nav>
+  <div class="sfoot">
+    <div class="user" title="Accounts are coming in a later version">
+      <span class="avatar" aria-hidden="true">LU</span>
+      <div class="uinfo"><b>Local user</b><span>Sign-in coming soon</span></div>
+    </div>
+    <div class="srow">
+      <button class="btn mini" id="themeBtn" onclick="toggleTheme()" title="Toggle dark mode" aria-label="Toggle dark mode">&#9788;</button>
+      <button class="btn mini grow" onclick="quitApp()" title="Stop Understudy">Quit</button>
+    </div>
+  </div>
+</aside>
+<div class="mainwrap">
+<div class="pathbar"><button class="sideopen" onclick="Shell.toggleSide()" title="Show the sidebar (Ctrl+B)" aria-label="Show the sidebar">&#9776;</button><span class="dim">Project</span> <span id="projpath">&hellip;</span></div>
+
+<main class="wrap">
+<section id="tab-record" hidden>
+  <div class="cmdbar" role="toolbar" aria-label="Recording setup">
+    <div class="cgroup cdev">
+      <span class="ldot" id="recDot" aria-hidden="true"></span>
+      <select id="recDevice" onchange="Rec.chooseDevice()" aria-label="Device"></select>
+      <button class="btn" onclick="Connect.open()">Connect device</button>
+      <button class="btn icon quiet" onclick="Rec.refreshDevices()" title="Look for devices again" aria-label="Look for devices again">&#8635;</button>
+      <button class="btn quiet" id="recDisconnect" onclick="Rec.disconnect()" disabled>Disconnect</button>
+    </div>
+    <div class="cgroup capp">
+      <label class="clabel" for="recApp">App</label>
+      <div class="appfield">
+        <input type="text" id="recApp" list="recPkgs" placeholder="com.example.app" spellcheck="false" aria-label="App ID">
+        <details class="menu right" id="appMenu">
+          <summary class="btn icon quiet" title="Choose an app or install an APK" aria-label="Choose an app or install an APK">&#9662;</summary>
+          <div class="menupop apppop">
+            <div class="mgroup">
+              <b>Installed on the device</b>
+              <button class="btn" onclick="Rec.pickApp()">Choose from installed apps&hellip;</button>
+            </div>
+            <div class="mgroup">
+              <b>Install from an APK</b>
+              <span class="fhint">APKs stay in this project's Apps folder. Nothing is uploaded.</span>
+              <div class="row2">
+                <select id="recApk" aria-label="APK"></select>
+                <button class="btn icon" id="recApkDel" onclick="Rec.deleteApk()" title="Remove this APK from the list" aria-label="Remove this APK" disabled>&times;</button>
+              </div>
+              <div class="row2">
+                <button class="btn" onclick="Rec.pickApk()">Add APK&hellip;</button>
+                <button class="btn solid" id="recInstall" onclick="Rec.installApk()" disabled>Install on device</button>
+              </div>
+              <input type="file" id="recApkFile" accept=".apk" hidden>
+            </div>
+          </div>
+        </details>
+      </div>
+      <datalist id="recPkgs"></datalist>
+      <label class="opt inline" title="Clear the app's data before launching"><input type="checkbox" id="recClear" checked> Fresh data</label>
+      <button class="btn" onclick="Rec.launch()">Launch app</button>
+    </div>
+    <div class="cgroup csave">
+      <button class="btn" id="recSaveRun" onclick="Rec.save(true)">Save and run</button>
+      <button class="btn solid" id="recSave" onclick="Rec.save(false)">Save flow</button>
+    </div>
+  </div>
+  <div class="devproblem" id="recProblemDev" hidden></div>
+
+  <div class="bench">
+    <div class="stagepane">
+      <div class="modebar" role="group" aria-label="What a click on the screen does">
+        <button class="mode" id="recMode-record" onclick="Rec.setMode('record')">Record</button>
+        <button class="mode" id="recMode-interact" onclick="Rec.setMode('interact')">Use phone</button>
+        <button class="mode" id="recMode-device" onclick="Rec.setMode('device')">From phone</button>
+      </div>
+      <div class="stage" id="recStage" data-state="empty">
+        <div class="stagebar">
+          <span class="live" id="recLive" role="status"><i></i><span id="recLiveText">Not connected</span></span>
+          <span class="grow"></span>
+          <label class="sw" title="Outline the element under the mouse, with the selector Maestro will use"><input type="checkbox" id="recInspectOn" checked><span>Elements</span></label>
+          <label class="sw" title="Outline every element on the screen at once"><input type="checkbox" id="recAllOn"><span>Show all</span></label>
+          <label class="sw" id="recFollowBox" title="From phone: keep taps in other apps (browser, camera ...) and add an Open app step when the app changes"><input type="checkbox" id="recFollow"><span>Other apps</span></label>
+        </div>
+        <div class="phone">
+          <canvas id="recScreen" aria-label="Device screen"></canvas>
+          <canvas id="recOverlay" class="elmap" aria-hidden="true"></canvas>
+          <div class="hoverbox" id="recHover" hidden></div>
+          <div class="hovertip" id="recTip" hidden></div>
+          <div class="box" id="recBox" hidden></div>
+          <div class="spot" id="recSpot"></div>
+        </div>
+        <div class="stage-empty">
+          <svg class="emptyphone" viewBox="0 0 48 48" aria-hidden="true"><rect x="13" y="4" width="22" height="40" rx="4"/><path d="M21 9h6"/><circle cx="24" cy="38" r="1.6"/></svg>
+          <p id="recEmpty">No device connected.</p>
+          <button class="btn solid" id="recEmptyCta" onclick="Connect.open()">Connect a device</button>
+        </div>
+        <div class="modehint" id="recModeHint"></div>
+      </div>
+      <div class="navbar" role="group" aria-label="Device buttons">
+        <button class="btn" onclick="Rec.nav('back')">Back</button>
+        <button class="btn" onclick="Rec.nav('home')">Home</button>
+        <button class="btn" onclick="Rec.nav('enter')">Enter</button>
+        <button class="btn" onclick="Rec.nav('hideKeyboard')">Hide keyboard</button>
+        <button class="btn" onclick="Rec.nav('scroll')">Scroll</button>
+        <button class="btn" onclick="Rec.nav('recents')">Recent apps</button>
+        <button class="btn" onclick="Rec.typeAny()" title="Type into the field that has focus on the phone">Type&hellip;</button>
+      </div>
+    </div>
+
+    <div class="scriptpane">
+      <div class="ptabs" role="tablist">
+        <button class="ptab active" id="ptab-steps" role="tab" onclick="Rec.panel('steps')">Steps <span class="count" id="recCount"></span></button>
+        <button class="ptab" id="ptab-flow" role="tab" onclick="Rec.panel('flow')">YAML</button>
+        <button class="ptab" id="ptab-el" role="tab" onclick="Rec.panel('el')">Inspect</button>
+        <button class="ptab" id="ptab-ai" role="tab" onclick="Rec.panel('ai')">AI</button>
+        <span class="grow"></span>
+        <button class="btn solid" id="recApply" onclick="Rec.applyYaml()" hidden>Apply changes</button>
+      </div>
+
+      <div class="pane" id="pane-steps">
+        <div class="ptools">
+          <details class="menu" id="insMenu">
+            <summary class="btn">Insert step &#9662;</summary>
+            <div class="menupop narrow insmenu">
+              <span class="mhead">Basics</span>
+              <button onclick="Rec.insert('wait')">Wait for animations</button>
+              <button onclick="Rec.insert('waitUntil')">Wait until something shows&hellip;</button>
+              <button onclick="Rec.insert('hideKeyboard')">Hide keyboard</button>
+              <button onclick="Rec.insert('back')">Press Back</button>
+              <button onclick="Rec.insert('enter')">Press Enter</button>
+              <button onclick="Rec.insert('key')">Press another key&hellip;</button>
+              <button onclick="Rec.insert('scroll')">Scroll down</button>
+              <button onclick="Rec.insert('erase')">Clear text</button>
+              <button onclick="Rec.insert('screenshot')">Screenshot</button>
+              <span class="mhead">Variables</span>
+              <button onclick="Rec.insert('setVar')">Set a variable&hellip;</button>
+              <button onclick="Rec.insert('typeVar')">Type a variable&hellip;</button>
+              <button onclick="Rec.insert('paste')">Paste copied text</button>
+              <button onclick="Rec.insert('assertTrue')">Check a condition&hellip;</button>
+              <span class="mhead">Apps and web</span>
+              <button onclick="Rec.insert('openApp')">Switch to another app&hellip;</button>
+              <button onclick="Rec.insert('openLink')">Open a link / browser&hellip;</button>
+              <button onclick="Rec.insert('stopApp')">Stop an app&hellip;</button>
+              <button onclick="Rec.insert('clearState')">Clear an app's data&hellip;</button>
+              <span class="mhead">Other flows</span>
+              <button onclick="Rec.insert('runFlowFile')">Run another flow file&hellip;</button>
+              <button onclick="Rec.insert('runScriptFile')">Run a JavaScript file&hellip;</button>
+              <span class="mhead">Device</span>
+              <button onclick="Rec.insert('setLocation')">Set GPS location&hellip;</button>
+              <button onclick="Rec.insert('airplaneOn')">Airplane mode on</button>
+              <button onclick="Rec.insert('airplaneOff')">Airplane mode off</button>
+              <button onclick="Rec.insert('recStart')">Start screen recording</button>
+              <button onclick="Rec.insert('recStop')">Stop screen recording</button>
+              <span class="mhead">Blocks</span>
+              <button onclick="Rec.insert('repeat')">Repeat block</button>
+              <button onclick="Rec.insert('if')">If visible &hellip; else &hellip;</button>
+              <button onclick="Rec.insert('ifExpr')">If variable / condition &hellip; else &hellip;</button>
+              <button onclick="Rec.insert('while')">Repeat while visible</button>
+              <button onclick="Rec.insert('retry')">Retry block</button>
+            </div>
+          </details>
+          <span class="grow"></span>
+          <button class="btn quiet" onclick="Rec.clearAll()">Clear all</button>
+        </div>
+        <div class="selbar" id="recSelBar" hidden>
+          <span id="recSelCount"></span>
+          <button class="btn" onclick="Rec.wrap('repeat')">Repeat</button>
+          <button class="btn" onclick="Rec.wrap('if')">If visible</button>
+          <button class="btn" onclick="Rec.wrap('ifExpr')">If condition</button>
+          <button class="btn" onclick="Rec.wrap('while')">While visible</button>
+          <button class="btn" onclick="Rec.wrap('retry')">Retry</button>
+          <button class="btn ghost" onclick="Rec.deleteSelected()">Delete</button>
+        </div>
+        <div class="rsteps" id="recSteps"></div>
+        <div class="flowmeta">
+          <div class="pair">
+            <label class="field"><span class="flabel">Save as (in Flows/)</span>
+              <input type="text" id="recFlow" placeholder="Login/login_valid.yaml" spellcheck="false"></label>
+            <label class="field"><span class="flabel">Tags</span>
+              <input type="text" id="recTags" placeholder="smoke, login" spellcheck="false"></label>
+          </div>
+          <div class="dataline" id="recVarLine">
+            <span class="flabel">Variables</span>
+            <span id="recVarText" class="dim">None. Use them as ${NAME} in any step.</span>
+            <button class="btn" onclick="Rec.editVars()">Edit</button>
+          </div>
+          <div class="dataline" id="recDataLine" hidden>
+            <span class="flabel">Test data</span>
+            <span id="recDataText"></span>
+            <button class="btn" onclick="Rec.chooseData()">Change</button>
+          </div>
+        </div>
+      </div>
+      <div class="pane" id="pane-flow" hidden>
+        <div class="derr" id="recProblem"></div>
+        <textarea class="yaml" id="recYaml" spellcheck="false" aria-label="Flow YAML" placeholder="The flow appears here as you record. You can also edit it directly."></textarea>
+        <div class="fhint">Edit freely: conditions, loops and any Maestro command. Press Apply changes (Ctrl+Enter) to update the steps.</div>
+      </div>
+      <div class="pane" id="pane-el" hidden>
+        <div id="recInspect"><div class="empty">Point at anything on the screen to see its selectors, or choose Inspect above and click an element to pin it.</div></div>
+      </div>
+      <div class="pane" id="pane-ai" hidden>
+        <div id="aiPane"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Connect a device (ui/connect.js) -->
+<div class="overlay" id="connectOv" hidden>
+  <div class="dialog connectdlg" role="dialog" aria-modal="true" aria-labelledby="connectTitle">
+    <div class="cd-head">
+      <div><h3 id="connectTitle">Connect a device</h3><p class="dtext">A phone by USB or Wi-Fi is the fastest option. No Android Studio needed.</p></div>
+      <button class="btn icon quiet" onclick="Connect.close()" aria-label="Close">&times;</button>
+    </div>
+    <div class="cd-tools" id="cdTools" hidden>
+      <div class="cd-toolcard">
+        <div><b>Install phone tools first</b><p>Understudy talks to phones through Google's official platform-tools (adb). One download, about 8 MB, kept inside Understudy's folder.</p></div>
+        <button class="btn solid" id="cdToolsBtn" onclick="Connect.installTools()">Install phone tools</button>
+      </div>
+      <div class="pbar" id="cdToolsBar" hidden><div></div></div>
+      <div class="fhint" id="cdToolsMsg"></div>
+    </div>
+    <div class="cd-devices" id="cdDevices"></div>
+    <div class="cd-tabs" role="tablist">
+      <button class="cd-tab active" id="cdt-usb" role="tab" onclick="Connect.tab('usb')">USB cable</button>
+      <button class="cd-tab" id="cdt-wifi" role="tab" onclick="Connect.tab('wifi')">Wi-Fi</button>
+      <button class="cd-tab" id="cdt-avd" role="tab" onclick="Connect.tab('avd')">Virtual device</button>
+    </div>
+
+    <div class="cd-pane" id="cdp-usb">
+      <ol class="cd-steps">
+        <li><b>Turn on developer options.</b> Settings &rsaquo; About phone &rsaquo; tap <i>Build number</i> seven times. On Xiaomi it is <i>MIUI version</i>, on Samsung it is under <i>Software information</i>.</li>
+        <li><b>Turn on USB debugging.</b> Settings &rsaquo; System &rsaquo; Developer options &rsaquo; <i>USB debugging</i>. On Xiaomi also turn on <i>USB debugging (Security settings)</i>.</li>
+        <li><b>Plug the phone in and tap Allow.</b> Unlock it and accept &ldquo;Allow USB debugging?&rdquo;. Tick <i>Always allow from this computer</i>.</li>
+      </ol>
+      <div class="cd-watch" id="cdUsbWatch"><i></i><span>Watching for a phone&hellip;</span></div>
+      <details class="cd-help"><summary>The phone is plugged in but nothing shows up</summary>
+        <ul>
+          <li>Use a data cable. Many charging cables have no data wires.</li>
+          <li>Pull down the notification shade, tap the USB notification and choose <i>File transfer</i>.</li>
+          <li>Windows: Samsung, Xiaomi and some others need the maker's USB driver (search &ldquo;&lt;brand&gt; USB driver&rdquo;). Pixel phones use the Google USB driver.</li>
+          <li>Still stuck: in Developer options choose <i>Revoke USB debugging authorizations</i>, unplug, plug in again and tap Allow.</li>
+        </ul>
+      </details>
+    </div>
+
+    <div class="cd-pane" id="cdp-wifi" hidden>
+      <div class="cd-qr">
+        <div class="qrbox" id="cdQr"><button class="btn solid" onclick="Connect.startQr()">Show pairing code</button></div>
+        <div class="qrtext">
+          <b>Pair with a QR code</b>
+          <ol class="cd-steps small">
+            <li>Phone and this PC on the same Wi-Fi network.</li>
+            <li>Phone: Developer options &rsaquo; <i>Wireless debugging</i> &rsaquo; turn on.</li>
+            <li>Tap <i>Pair device with QR code</i> and scan this code.</li>
+          </ol>
+          <div class="cd-watch" id="cdQrState" hidden><i></i><span></span></div>
+          <p class="fhint">Android 11 or newer. Paired phones reconnect from the same screen later without a code.</p>
+        </div>
+      </div>
+      <details class="cd-help" id="cdManual"><summary>Pair with a 6-digit code, or connect by address</summary>
+        <div class="cd-manual">
+          <ol class="cd-steps small">
+            <li>First time on this PC: on the phone tap <i>Wireless debugging</i> &rsaquo; <i>Pair device with pairing code</i> and keep that window open.</li>
+            <li>Enter the <b>IP address &amp; port</b> and the <b>code</b> shown in that window. Understudy pairs, then finds the connection address by itself.</li>
+            <li>Paired before? Leave the code empty and enter only the <b>IP address &amp; Port</b> from the top of the Wireless debugging screen.</li>
+          </ol>
+          <div class="row2">
+            <input type="text" id="recPairAddr" placeholder="Pairing IP:port, e.g. 192.168.0.12:41235" spellcheck="false" aria-label="Pairing address">
+            <input type="text" id="recPairCode" placeholder="6-digit code" inputmode="numeric" maxlength="6" aria-label="Pairing code">
+          </div>
+          <label class="field"><span class="flabel">Connection IP:port (the top of Wireless debugging; not the pairing port)</span>
+            <input type="text" id="recAddr" placeholder="192.168.0.12:37123" spellcheck="false"></label>
+          <div class="row2">
+            <button class="btn solid" onclick="Rec.connectWifi()">Connect</button>
+            <button class="btn" onclick="Connect.checkWifi()" title="Tests whether this PC can reach the phone and says why not">Check connection</button>
+          </div>
+          <div class="cd-watch" id="cdWifiMsg" hidden><i></i><span></span></div>
+        </div>
+      </details>
+      <details class="cd-help"><summary>Phone already connected by USB? Move it to Wi-Fi</summary>
+        <p class="fhint">Works on every Android version, also where the QR code and pairing code don't. Keep the cable in until it says connected. The Wi-Fi connection lasts until the phone restarts.</p>
+        <button class="btn" onclick="Rec.usbToWifi()">Switch the USB phone to Wi-Fi</button>
+      </details>
+      <details class="cd-help"><summary>Wi-Fi doesn't work at the office?</summary>
+        <ul>
+          <li><b>Same network.</b> The phone and this PC must be on the same Wi-Fi. A PC on a network cable is often on a different office network.</li>
+          <li><b>Office and guest Wi-Fi</b> often keep devices apart (&ldquo;client isolation&rdquo;) and block how phones announce themselves. <i>Check connection</i> tells you when that is the case. Then connect the phone to this PC's <i>Mobile hotspot</i> (Windows Settings &rsaquo; Network &rsaquo; Mobile hotspot), or record over USB.</li>
+          <li><b>Firewall.</b> If Windows asked whether <i>adb.exe</i> may use the network, it must be allowed on private networks. On a managed PC, IT may have to allow it.</li>
+          <li><b>VPN or security client</b> on this PC can block local traffic. Ask IT to allow the local network, or use USB.</li>
+          <li><b>Phone asleep.</b> Keep it unlocked, or turn on <i>Developer options &rsaquo; Stay awake</i> while charging. Wireless debugging turns off when the phone changes Wi-Fi.</li>
+        </ul>
+      </details>
+    </div>
+
+    <div class="cd-pane" id="cdp-avd" hidden>
+      <p class="dtext">A virtual phone runs on this PC. It needs about 2 GB of free memory and is slower than a real phone.</p>
+      <div class="cd-avd" id="cdAvdBox">
+        <label class="field"><span class="flabel">Virtual device</span><select id="recAvd" aria-label="Virtual device"></select></label>
+        <label class="field"><span class="flabel">Graphics</span>
+          <select id="recGfx" aria-label="Graphics">
+            <option value="auto">Fast (uses your graphics card)</option>
+            <option value="software">Compatible (slower)</option>
+          </select></label>
+        <label class="opt inline" title="1.5 GB RAM, 2 CPU cores, no cameras, nothing saved on exit"><input type="checkbox" id="recLight"> Light mode for PCs with 8 GB RAM or less</label>
+        <label class="opt inline"><input type="checkbox" id="recWindow"> Also open the emulator's own window</label>
+        <div class="row2"><button class="btn solid" id="recStartAvd" onclick="Rec.startAvd()">Start virtual device</button></div>
+      </div>
+      <div class="cd-noavd" id="cdNoAvd" hidden>
+        <p>No virtual device is installed. The virtual-device tools are a separate download of about 1.5 GB.</p>
+        <button class="btn" onclick="installAndroid()">Install virtual-device tools&hellip;</button>
+      </div>
+      <details class="cd-help"><summary>Clean state and memory</summary>
+        <p class="fhint">Save the running virtual device as it is now, and go back to it before recording or testing.</p>
+        <div class="row2"><button class="btn" onclick="Rec.snapshot('save')">Save clean state</button>
+        <button class="btn" onclick="Rec.snapshot('load')">Reset to clean state</button>
+        <button class="btn" onclick="Rec.freeMemory()">Free memory&hellip;</button></div>
+      </details>
+    </div>
+    <div class="cd-help">
+      <label class="opt inline" title="Window, transition and animator scales are set to 0 while you record, and put back when you disconnect or quit Understudy">
+        <input type="checkbox" id="cdAnimOff" checked onchange="Connect.setAnimPref(this.checked)">
+        Turn off phone animations while recording: elements are found faster and more reliably. Restored when you disconnect or quit.</label>
+    </div>
+  </div>
+</div>
+
+<section id="tab-run">
+  <div class="pagehead">
+    <h2>Run Flows</h2>
+    <p>Prepare the data, choose the flows, arrange the queue, and run. Each flow writes its own report.</p>
+  </div>
+
+  <div class="card">
+    <div class="chead"><div><span class="eyebrow">Step 1</span><h3>Prepare data</h3></div></div>
+    <div class="toolbar" style="margin:0;">
+      <button id="prepBtn" class="btn solid" onclick="prepareData()">Prepare Data</button>
+      <span class="status">Converts the Excel data into Maestro scripts. Re-run after changing data.</span>
+      <span style="flex:1"></span>
+      <button class="btn mini" onclick="openFolder('reports')">Open Reports</button>
+      <button class="btn mini" onclick="openFolder('testdata')">Open TestData</button>
+      <button class="btn mini" onclick="openFolder('flowbackups')">Open FlowBackups</button>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="chead"><div><span class="eyebrow">Step 2</span><h3>Choose flows</h3></div></div>
+      <div class="toolbar">
+        <input type="text" id="filter" placeholder="Filter flows&hellip;" oninput="renderFlows()" style="flex:1; min-width:120px;">
+        <button class="btn" onclick="selAll(true)">Select visible</button>
+        <button class="btn" onclick="selAll(false)">Clear</button>
+        <button class="btn" onclick="loadFlows()">Reload</button>
+      </div>
+      <div class="tagbar" id="tagbar"></div>
+      <div class="flowlist" id="flows">Loading&hellip;</div>
+      <div class="hint">Flows run in the order you tick them. Reorder in the queue panel.</div>
+    </div>
+
+    <div class="card">
+      <div class="chead"><div><span class="eyebrow">Step 3</span><h3>Run queue</h3></div></div>
+      <div class="suitebar">
+        <select id="suiteSel" title="Saved test suites"><option value="">Test suites&hellip;</option></select>
+        <button class="btn mini" id="suiteLoad" onclick="suiteLoad()">Load</button>
+        <button class="btn mini solid" id="suiteRun" onclick="suiteRun()">Run suite</button>
+        <button class="btn mini" onclick="suiteSave()">Save queue as suite</button>
+        <button class="btn mini" onclick="suiteDelete()">Delete</button>
+      </div>
+      <div class="flowlist" id="queue" style="max-height:420px;"></div>
+      <label class="opt"><input type="checkbox" id="stopOnFail"> Stop the queue if a flow fails</label>
+      <div class="hint">Rows: leave empty for row 1, or type <code>all</code>, <code>2,7,13</code>, <code>2-5</code>. Each flow uses its own Excel sheet; each row runs as a separate test with its own report.</div>
+      <div class="actions">
+        <button id="runBtn"     class="btn solid big" onclick="runSelected()">Run Selected</button>
+        <button id="runAllBtn"  class="btn big"       onclick="runAll()">Run All</button>
+        <button id="stopBtn"    class="btn stop big"  onclick="stopRun()" disabled>Stop</button>
+        <button id="rerunBtn"   class="btn big"       onclick="rerunFailed()" disabled title="Rerun only the flows that failed in the last run">Rerun failed</button>
+      </div>
+      <div class="status" id="status" style="margin-top:14px;"></div>
+    </div>
+  </div>
+
+  <div class="card" id="liveCard">
+    <div class="chead">
+      <div><span class="eyebrow">Live run</span><h3 id="liveTitle">Idle</h3></div>
+      <div class="livestats" id="liveStats"></div>
+    </div>
+    <div class="pbar"><div id="pfill"></div></div>
+    <div class="livegrid">
+      <div class="stepbox" id="steps"><div class="empty">Steps appear here while a flow runs: which command is running, what passed, and where it failed.</div></div>
+      <div class="datapanel" id="liveData"><div class="empty">The Excel row used by the running flow shows here.</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="chead"><div><span class="eyebrow">Results</span><h3>Results</h3></div></div>
+    <div id="results"><div class="empty">No runs yet.</div></div>
+  </div>
+
+  <div class="card">
+    <div class="chead">
+      <div><span class="eyebrow">Console</span><h3>Live output</h3></div>
+      <div style="display:flex; gap:6px;">
+        <button class="btn mini" onclick="copyLog()">Copy log</button>
+        <button class="btn mini" onclick="clearLog()">Clear</button>
+      </div>
+    </div>
+    <pre id="log">Waiting&hellip;</pre>
+  </div>
+
+  <div class="card">
+    <div class="rhead">
+      <div><span class="eyebrow">Report</span><h3 style="margin:0;">Detailed view</h3></div>
+      <div style="display:flex; gap:6px; align-items:center;">
+        <select id="reportSelect" onchange="showReport(this.value)"></select>
+        <button class="btn mini" onclick="loadReports()">Refresh</button>
+        <button class="btn mini" onclick="openReport()">Open in new tab</button>
+      </div>
+    </div>
+    <iframe id="reportFrame" src="about:blank"></iframe>
+  </div>
+</section>
+
+<section id="tab-data" hidden>
+  <div class="pagehead">
+    <h2>Test Data</h2>
+    <p>All Excel files live under <code>TestData/</code>. Edit cells, insert or delete rows and columns anywhere, add sheets, and create new files. A backup is kept before every save.</p>
+  </div>
+  <div id="xwarn"></div>
+  <div class="xgrid">
+    <div class="card">
+      <div class="chead"><div><span class="eyebrow">Library</span><h3>Excel files</h3></div></div>
+      <div class="toolbar">
+        <button class="btn solid" onclick="newFile()">+ New file</button>
+        <button class="btn" onclick="loadExcelFiles()">Refresh</button>
+      </div>
+      <div class="flowlist" id="xfiles" style="max-height:60vh;">Loading&hellip;</div>
+    </div>
+    <div class="card">
+      <div class="chead"><div><span class="eyebrow">Editor</span><h3 id="xtitle">Select a file to begin</h3></div></div>
+      <div id="xmeta" class="hint" hidden></div>
+      <div class="stabs" id="stabs"></div>
+      <div class="tablebox" id="xtable" hidden></div>
+      <div class="actions" id="xactions" hidden>
+        <button class="btn solid" id="saveBtn" onclick="saveExcel(false)">Save</button>
+        <button class="btn solid" id="savePrepBtn" onclick="saveExcel(true)">Save &amp; Prepare Data</button>
+        <span style="flex:1"></span>
+        <button class="btn" onclick="addRowEnd()">+ Row at end</button>
+        <button class="btn" onclick="addColEnd()">+ Column at end</button>
+        <span class="status" id="xstatus"></span>
+      </div>
+      <div class="hint" id="xhint" hidden>Hover a row number or column letter: <b>+&uarr;</b> / <b>+&darr;</b> insert a row above / below, <b>+&larr;</b> / <b>+&rarr;</b> insert a column left / right, <b>&minus;</b> deletes. Edited cells are highlighted. Formula and date cells are read-only.</div>
+    </div>
+  </div>
+</section>
+
+<section id="tab-editor" hidden>
+  <div class="pagehead">
+    <h2>Editor</h2>
+    <p>Browse and edit Maestro flows. Every save keeps a backup in <code>FlowBackups/</code>. Syntax highlighting turns on automatically when online.</p>
+  </div>
+  <div class="xgrid">
+    <div class="card">
+      <div class="chead"><div><span class="eyebrow">Flows</span><h3>Choose a flow</h3></div></div>
+      <div class="toolbar">
+        <input type="text" id="edFilter" placeholder="Filter flows&hellip;" oninput="renderFlowEditorList()" style="flex:1; min-width:120px;">
+        <button class="btn" onclick="loadFlows()">Refresh</button>
+        <button class="btn" onclick="newFlowDialog()">+ New flow</button>
+      </div>
+      <div class="flowlist" id="edList" style="max-height:60vh;">Loading&hellip;</div>
+    </div>
+    <div class="card">
+      <div class="chead">
+        <div><span class="eyebrow">Editing</span><h3 id="edTitle">Select a flow to begin</h3></div>
+        <div style="display:flex; gap:6px;">
+          <button class="btn solid" id="edSave"   onclick="saveFlow()"   disabled>Save</button>
+          <button class="btn"       id="edRevert" onclick="revertFlow()" disabled>Revert</button>
+          <button class="btn"       id="edRun"    onclick="runCurrentFlow()" disabled>Run this flow</button>
+          <button class="btn"       id="edRunFrom" onclick="Reports.runFromStepDialog(ed.current)" title="Start at any step; data scripts and variables before it are loaded first">Run from step&hellip;</button>
+        </div>
+      </div>
+      <div id="edMeta" class="hint" hidden></div>
+      <div id="edWrap" class="editorbox" hidden>
+        <textarea id="edArea" spellcheck="false" placeholder="Flow content will appear here&hellip;"></textarea>
+      </div>
+      <div class="hint" id="edHint" hidden>Unsaved changes are highlighted in the header.</div>
+    </div>
+  </div>
+</section>
+<section id="tab-setup" hidden>
+  <div class="pagehead">
+    <h2>Setup</h2>
+    <p>What this computer needs to record and run tests. Everything is free and runs locally. Your APKs, flows and data never leave this PC.</p>
+  </div>
+  <div class="card">
+    <div class="chead"><h3>Checklist</h3>
+      <div style="display:flex; gap:6px; align-items:center;"><span class="status" id="doctorSum"></span>
+      <button class="btn mini" id="doctorBtn" onclick="runDoctor()">Check again</button></div></div>
+    <div id="doctor"></div>
+  </div>
+  <div class="card">
+    <div class="chead"><h3>Phones: no Android Studio needed</h3>
+      <button class="btn solid" onclick="Connect.open()">Connect device</button></div>
+    <p class="prose">A USB or Wi-Fi phone only needs Google's platform-tools (adb). Understudy downloads it into its own folder when you press <b>Install phone tools</b> (about 8 MB, no admin rights, nothing else changed). Wi-Fi phones pair by scanning a QR code.</p>
+  </div>
+  <div class="card">
+    <div class="chead"><h3>Virtual devices <span class="dim">(optional)</span></h3>
+      <button class="btn" onclick="installAndroid()">Install virtual-device tools&hellip;</button></div>
+    <p class="prose">Only if you want to test without a phone. Installs the emulator and one light system image from Google's official server, then creates Understudy_Pixel (2 GB RAM). About 1.5 GB to download. A window shows the progress.</p>
+  </div>
+  <div class="card">
+    <div class="chead"><h3>AI helper <span class="dim">(optional)</span></h3></div>
+    <div id="aiSetup"><div class="empty">Checking&hellip;</div></div>
+  </div>
+  <div class="card">
+    <div class="chead"><h3>Free memory</h3><button class="btn mini" onclick="Rec.freeMemory()">Show Android programs&hellip;</button></div>
+    <p class="prose">After you close a virtual device, the emulator, adb and Android Studio can keep gigabytes of memory. Understudy ends the emulator itself when you press Stop; use this to end everything Android-related at once.</p>
+  </div>
+  <div class="card">
+    <div class="chead"><h3>Typing non-English text</h3></div>
+    <p class="prose">With the live screen, Bengali and any other script is typed through the device clipboard, nothing to install. Without it, install the free, open-source ADB Keyboard app on the device once (add its APK on the Record tab and press Install).</p>
+  </div>
+  <div class="card">
+    <div class="chead"><h3>Folders</h3></div>
+    <div class="toolbar" style="margin:0;">
+      <button class="btn mini" onclick="openFolder('project')">Project</button>
+      <button class="btn mini" onclick="openFolder('flows')">Flows</button>
+      <button class="btn mini" onclick="openFolder('testdata')">TestData</button>
+      <button class="btn mini" onclick="openFolder('apps')">Apps (APKs)</button>
+      <button class="btn mini" onclick="openFolder('reports')">Reports</button>
+      <button class="btn mini" onclick="openFolder('logs')">Logs</button>
+      <button class="btn mini" onclick="openFolder('install')">Understudy install</button>
+    </div>
+  </div>
+</section>
+
+<section id="tab-reports" hidden>
+  <div class="pagehead">
+    <h2>Reports</h2>
+    <p>Every run, with each test's steps, timings, the Excel row it used and the screen where it failed. Each run is also saved as one self-contained HTML file in <code>Reports/</code> that you can e-mail or open anywhere.</p>
+  </div>
+  <div class="repgrid">
+    <div class="card replist">
+      <div class="chead"><h3>Runs</h3><div style="display:flex;gap:6px"><button class="btn mini" onclick="Reports.load()">Refresh</button><button class="btn mini" onclick="openFolder('reports')">Folder</button></div></div>
+      <input type="text" id="repFilter" placeholder="Filter by flow or suite&hellip;" oninput="Reports.renderList()">
+      <div class="repruns" id="repRuns"><div class="empty">Loading&hellip;</div></div>
+    </div>
+    <div id="repView" class="repview"><div class="card"><div class="empty">Choose a run on the left.</div></div></div>
+  </div>
+</section>
+
+<section id="tab-dashboard" hidden>
+  <div class="pagehead">
+    <h2>Dashboard</h2>
+    <p>Trends from your run history (saved in <code>History/</code>). Compare any two runs to see what got fixed or broke.</p>
+  </div>
+  <div class="kpis" id="kpis"></div>
+  <div class="dgrid">
+    <div class="card"><div class="chead"><div><span class="eyebrow">Last 30 runs</span><h3>Passed vs failed</h3></div></div><div id="chRuns" class="chart"></div></div>
+    <div class="card"><div class="chead"><div><span class="eyebrow">Last 30 runs</span><h3>Pass rate</h3></div></div><div id="chRate" class="chart"></div></div>
+    <div class="card"><div class="chead"><div><span class="eyebrow">All history</span><h3>Most failures</h3></div></div><div id="chFail" class="chart"></div></div>
+    <div class="card"><div class="chead"><div><span class="eyebrow">Average</span><h3>Slowest tests</h3></div></div><div id="chSlow" class="chart"></div></div>
+  </div>
+  <div class="card"><div class="chead"><div><span class="eyebrow">Last 10 runs</span><h3>Flaky tests</h3></div><span class="hint" style="margin:0;">Same flow and row both passed and failed, newest on the right</span></div><div id="flaky"></div></div>
+  <div class="card">
+    <div class="chead"><div><span class="eyebrow">Report difference</span><h3>Compare two runs</h3></div></div>
+    <div class="toolbar">
+      <label class="qlbl">Before</label><select id="cmpA" onchange="renderCompare()"></select>
+      <label class="qlbl">After</label><select id="cmpB" onchange="renderCompare()"></select>
+    </div>
+    <div id="cmpOut"></div>
+  </div>
+</section>
+</main>
+
+</div>
+
+<script src="src/core/secure-fetch.ui.js"></script>
+<script src="app.js"></script>
+<script src="src/run/run.ui.js"></script>
+<script src="src/run/run-extras.ui.js"></script>
+<script src="src/data/excel.ui.js"></script>
+<script src="src/data/flows.ui.js"></script>
+<script src="src/reports/dashboard.ui.js"></script>
+<script src="src/reports/reports.ui.js"></script>
+<script src="src/setup/setup.ui.js"></script>
+<script src="src/device/connect.ui.js"></script>
+<script src="src/record/recorder.ui.js"></script>
+<script src="src/projects/projects.ui.js"></script>
+<script src="src/ai/ai.ui.js"></script>
+<script src="src/core/shell.ui.js"></script>
+</body></html>

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Understudy">
+  <rect width="64" height="64" rx="15" fill="#17191e"/>
+  <!-- the stand-in, a step behind -->
+  <path d="M24 21v13a11 11 0 0 0 22 0V21" fill="none" stroke="#c99a4b" stroke-width="4.2" stroke-linecap="round"/>
+  <!-- the performer -->
+  <path d="M18 17v13a11 11 0 0 0 22 0V17" fill="none" stroke="#f5f5f2" stroke-width="4.2" stroke-linecap="round"/>
+</svg>

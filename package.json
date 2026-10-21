@@ -1,0 +1,24 @@
+{
+  "name": "understudy",
+  "version": "2.0.0",
+  "description": "Record Android tests by clicking, make them data-driven with Excel, and run them with Maestro. Runs 100% locally.",
+  "private": true,
+  "license": "UNLICENSED",
+  "author": "Hasin Md. Daiyan <daiyanhasin07@gmail.com>",
+  "main": "web-gui.js",
+  "scripts": {
+    "start": "node web-gui.js",
+    "start:console": "node web-gui.js --no-open",
+    "prepare-data": "node -e \"require('./src/data/prepare').prepareData(t=>process.stdout.write(t))\"",
+    "check": "node tools/check.js",
+    "frame-speed": "node tools/frame-speed.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+    "yaml": "^2.9.1"
+  }
+}

@@ -1,0 +1,19 @@
+# Keep Windows batch files with CRLF so they run correctly after cloning
+*.bat   text eol=crlf
+*.vbs   text eol=crlf
+*.js    text
+*.json  text
+*.yaml  text
+*.yml   text
+*.md    text
+*.html  text
+*.css   text
+*.xlsx  binary
+*.png   binary
+*.svg  text
+*.webmanifest text
+*.ico  binary
+*.apk  binary
+*.webp binary
+*.woff2 binary
+*.ps1  text eol=crlf

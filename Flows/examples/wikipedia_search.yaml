@@ -1,0 +1,21 @@
+# Example data-driven flow (Wikipedia Android app, org.wikipedia).
+# Each Excel row in TestData/ExampleData.xlsx > "Search" runs as its own test.
+# Pick rows in the Run queue: empty = row 1, "all", "2,4", "1-3".
+appId: org.wikipedia
+name: Wikipedia search (example)
+tags:
+  - example
+  - smoke
+---
+- launchApp:
+    clearState: true
+
+# Sub-flow: its own steps show indented in the Live run panel
+- runFlow: common/skip_onboarding.yaml
+
+# Load the selected Excel row. Columns become ${output.<column name>}
+- runScript: "../../Scripts/ExampleData/Search.js"
+
+- tapOn: "Search Wikipedia"
+- inputText: ${output.searchTerm}
+- assertVisible: ${output.expected}
