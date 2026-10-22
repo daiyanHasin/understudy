@@ -5714,6 +5714,19 @@ body:has(#xactions[hidden]) .xonly {
   row-gap:0;
 }
 
+/* The phone never loses its top or left edge. Centred content that is larger than the stage spills
+   out on both sides, and overflow:hidden then cut off the top and the left of the phone. With "safe"
+   centring it starts at the top-left instead (fitPhone in recorder.ui.js keeps it inside anyway). */
+
+.stage[data-state="live"] {
+  align-items:safe center;
+  justify-content:safe center;
+}
+
+.stage > .phone {
+  flex:none;
+}
+
 /* No phone yet: a calm panel with the three ways to connect */
 
 .stagepane > .stage {

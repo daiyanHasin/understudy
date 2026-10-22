@@ -75,7 +75,10 @@ module.exports = function register(r, ctx) {
   });
   /* Wi-Fi pairing by QR code */
   POST("/api/pair/start", (req, res) => json(res, 200, pairing.start({
-    canRestart: () => !state.busy,                       // restarting adb would cut a running test
+    // Restarting adb cuts every connected phone (a running test, or the USB phone on the Record
+    // tab). Only when nothing is connected; otherwise the QR hint says to use the 6-digit code.
+    canRestart: async () => !state.busy &&
+      !(await android.devices({ fresh: true }).catch(() => [])).some(d => d.state === "device"),
     beforeRestart: () => { try { capture.stopAll(); } catch (_) {} }
   })));
   GET("/api/pair/status", (req, res) => json(res, 200, pairing.status()));

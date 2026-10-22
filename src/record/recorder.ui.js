@@ -87,16 +87,21 @@ var Rec = (function () {
     var name = x.avd ? x.avd.replace(/_/g, " ") : (x.model || x.serial);
     return name + "  \u00b7  " + (x.emulator ? "virtual" : x.wifi ? "Wi-Fi" : "USB");
   }
+  // A real phone that adb lists as "device" is ready; only virtual devices have to finish booting
+  function isUp(x) { return !!x && (x.booted || !x.emulator); }
   function refreshDevices() {
     return api("/api/device/list").then(function (d) {
+      var prev = S.serial;
       var sel = $("recDevice"); sel.innerHTML = "";
       var ready = d.devices.filter(function (x) { return x.state === "device"; });
       var waiting = d.devices.filter(function (x) { return x.state !== "device"; });
       if (!ready.length) opt(sel, "", waiting.length ? "Phone needs attention" : "No device");
-      ready.forEach(function (x) { opt(sel, x.serial, devLabel(x) + (x.booted ? "" : "  (starting\u2026)")); });
+      ready.forEach(function (x) { opt(sel, x.serial, devLabel(x) + (isUp(x) ? "" : "  (starting\u2026)")); });
       waiting.forEach(function (x) { var o = opt(sel, "", devLabel(x) + "  (" + (x.state === "unauthorized" ? "tap Allow on the phone" : x.state) + ")"); o.disabled = true; });
       if (!ready.some(function (x) { return x.serial === S.serial; })) S.serial = ready.length ? ready[0].serial : "";
       sel.value = S.serial;
+      // The phone in use went away (or another one took its place): end its picture loop cleanly
+      if (prev !== S.serial) { stopStream(); S.layout = null; closeMenu(); }
       var avd = $("recAvd"), keep = avd.value; avd.innerHTML = "";
       if (!d.avds.length) opt(avd, "", "None installed");
       d.avds.forEach(function (a) { opt(avd, a, a.replace(/_/g, " ")); });
@@ -106,14 +111,14 @@ var Rec = (function () {
       $("recDisconnect").disabled = !cur;
       $("recDisconnect").hidden = !cur || (!cur.emulator && !cur.wifi);      // USB phones: unplug the cable
       $("recDisconnect").textContent = cur && cur.emulator ? "Stop" : "Disconnect";
-      $("recDot").className = "ldot" + (cur ? (cur.booted ? " on" : " boot") : waiting.length ? " warn" : "");
+      $("recDot").className = "ldot" + (cur ? (isUp(cur) ? " on" : " boot") : waiting.length ? " warn" : "");
       showProblem(d.problems || {});
-      if (cur) setStage(cur.booted ? "live" : "booting");
+      if (cur) setStage(isUp(cur) ? "live" : "booting");
       else if (d.adb && d.adb.ok === false) setStage("empty", "Install the phone tools to connect a device (about 8 MB, no Android Studio).");
       else if (waiting.length) setStage("waiting", WAIT_TEXT[waiting[0].state] || "The device is not ready yet.");
       else setStage("empty");
-      if (cur && cur.booted) { loadPackages(); startStream(); }
-      watchDevices(!cur || !cur.booted);
+      if (isUp(cur)) { loadPackages(); startStream(); }
+      watchDevices(!isUp(cur));
       return d;
     }).catch(function (e) { setStage("empty", e.message); watchDevices(true); });
   }
@@ -404,7 +409,10 @@ var Rec = (function () {
 
   /* ======================= Screen ======================= */
   function setStage(st, msg) {
+    var was = $("recStage").getAttribute("data-state");
     $("recStage").setAttribute("data-state", st);
+    // Live shows the mode bar above the phone and the buttons beside it: the phone must be sized again
+    if (st === "live" && was !== "live") fitPhone();
     $("recEmpty").textContent = msg || (st === "booting" ? "Starting the device\u2026" : "No device connected.");
     $("recEmptyCta").textContent = st === "waiting" ? "Connection help" : "Connect a device";
   }
@@ -453,20 +461,34 @@ var Rec = (function () {
      width from the screen's own shape, so there are no wide empty bands around it. */
   function fitPhone() {
     var c = $("recScreen"), st = $("recStage");
-    if (!c || !st || !c.width || !c.height || $("tab-record").hidden) return;
-    var nav = document.querySelector("#tab-record .navbar");
-    for (var pass = 0; pass < 2; pass++) {             // a narrower phone can wrap the buttons below it: measure again
-      var top = st.getBoundingClientRect().top + (window.scrollY || 0);
-      // the device buttons can sit under the phone or beside it (design 2.1): only buttons underneath take height
-      var navBelow = nav && nav.offsetParent && nav.getBoundingClientRect().top >= st.getBoundingClientRect().bottom - 1;
-      var navSide = nav && nav.offsetParent && !navBelow ? nav.offsetWidth + 10 : 0;
-      var below = (navBelow ? nav.offsetHeight + 10 : 0) + 14;
-      var availH = Math.max(360, window.innerHeight - top - 40 - 34 - 16 - below);   // stage bar, hint, phone frame, buttons
-      var availW = Math.max(300, Math.min(window.innerWidth * 0.6, 760) - 24 - 16 - navSide);
-      var h = Math.min(availH, availW * c.height / c.width);
-      c.style.height = Math.round(h) + "px";
-      c.style.width = Math.round(h * c.width / c.height) + "px";
-    }
+    if (!c || !st || !c.width || !c.height || !S.dw || $("tab-record").hidden) return;   // !S.dw: no picture yet (canvas still 300x150)
+    // Before the stage is live the mode bar and the device buttons are hidden (design 2.1), so the
+    // space measured now is larger than the space the phone gets. Sizing then made the phone too big
+    // for the stage once it went live; centred and clipped, its top and left were cut off.
+    if (st.getAttribute("data-state") !== "live") return;
+    var px = function (elm, prop) { return parseFloat(getComputedStyle(elm)[prop]) || 0; };
+    var FRAME = 16;                                             // .phone padding: 8 px on each side
+    var padX = px(st, "paddingLeft") + px(st, "paddingRight");
+    var padY = px(st, "paddingTop") + px(st, "paddingBottom");  // stage bar above, mode hint below
+    var pane = st.parentElement, bench = pane && pane.parentElement;
+    // Height: the stage's own height (set by the page), never past the bottom of the window
+    var r = st.getBoundingClientRect();
+    var benchPadB = bench ? px(bench, "paddingBottom") : 14;
+    var boxH = Math.min(st.clientHeight, window.innerHeight - r.top - benchPadB);
+    var availH = boxH - padY - FRAME;
+    // Width: the phone column grows with the phone (fit-content, at most 760 px), so it cannot be
+    // measured. Work it out from the bench instead (this counts the sidebar, open or collapsed).
+    var benchW = bench ? bench.clientWidth - px(bench, "paddingLeft") - px(bench, "paddingRight") : window.innerWidth;
+    var oneColumn = bench && getComputedStyle(bench).gridTemplateColumns.trim().split(/\s+/).length < 2;
+    var colW = oneColumn ? benchW : Math.min(760, benchW * 0.62);
+    var nav = pane && pane.querySelector(".navbar");
+    var navBeside = nav && nav.offsetParent && nav.getBoundingClientRect().top < r.bottom - 1 && nav.getBoundingClientRect().left >= r.right - 1;
+    var navW = navBeside ? nav.offsetWidth + px(pane, "columnGap") : 0;
+    var availW = colW - navW - padX - FRAME;
+    availH = Math.max(120, availH); availW = Math.max(120, availW);
+    var h = Math.min(availH, availW * c.height / c.width);
+    c.style.height = Math.floor(h) + "px";
+    c.style.width = Math.floor(h * c.width / c.height) + "px";
     drawAll();
   }
   /* ---- SPS fix: "show every picture at once" (2.0.1) ----
@@ -709,10 +731,11 @@ var Rec = (function () {
       .then(function (f) {
         if (serial !== S.serial) return;
         var c = $("recScreen");
+        setStage("live");                                     // first: the phone is sized for the live layout
         if (c.width !== f.w || c.height !== f.h) { c.width = f.w; c.height = f.h; S.ctx = null; fitPhone(); }
         S.ctx = S.ctx || c.getContext("2d");
         S.ctx.putImageData(new ImageData(new Uint8ClampedArray(f.buf), f.w, f.h), 0, 0);
-        S.streamErr = 0; setStage("live");
+        S.streamErr = 0;
         S.frames++;
         // Size known: switch to the live video when this PC and the phone can do it
         if (canVideo()) { if (!S.video) startVideo(gen); return; }
@@ -722,8 +745,14 @@ var Rec = (function () {
         frame(gen);
       })
       .catch(function (e) {
+        if (gen !== S.frameGen || !S.streaming) return;
         S.streamErr++;
-        if (S.streamErr > 3) { setStage("empty", e.message); liveLabel("No picture", "warn"); }
+        // A few misses in a row: ask adb whether the phone is still there. Unplugged, the list
+        // says so and ends this loop; still there, the picture just keeps being retried.
+        if (S.streamErr % 5 === 3) refreshDevices();
+        // Not "empty": that showed the whole "Connect a phone" page for a phone that was only
+        // slow for a moment, which looked like a disconnect.
+        if (S.streamErr > 3 && S.serial === serial) { setStage("waiting", "Lost the phone\u2019s picture (" + e.message + "). Trying again\u2026"); liveLabel("No picture", "warn"); }
         setTimeout(function () { frame(gen); }, 1500);
       });
   }
@@ -1981,6 +2010,12 @@ var Rec = (function () {
       }
     });
     window.addEventListener("resize", function () { clearTimeout(S.fitT); S.fitT = setTimeout(fitPhone, 80); });
+    // The sidebar opening or closing, or the top bar wrapping onto two lines, changes the space
+    // without a window resize. The bench's size never depends on the phone, so this cannot loop.
+    if (window.ResizeObserver) {
+      var bench = document.querySelector("#tab-record .bench");
+      if (bench) new ResizeObserver(function () { clearTimeout(S.fitT); S.fitT = setTimeout(fitPhone, 60); }).observe(bench);
+    }
     document.addEventListener("visibilitychange", function () {
       if (!document.hidden && !$("tab-record").hidden && S.serial) startStream();
     });

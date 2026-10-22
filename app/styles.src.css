@@ -1039,6 +1039,12 @@ body:has(#xactions[hidden]) .xonly { display:none; }
 #tab-record:has(#recStage:not([data-state="live"])) .stagepane > .modebar { display:none; }
 #tab-record:has(#recStage:not([data-state="live"])) .stagepane { grid-template-rows:0 minmax(0,1fr); row-gap:0; }
 
+/* The phone never loses its top or left edge. Centred content that is larger than the stage spills
+   out on both sides, and overflow:hidden then cut off the top and the left of the phone. With "safe"
+   centring it starts at the top-left instead (fitPhone in recorder.ui.js keeps it inside anyway). */
+.stage[data-state="live"] { align-items:safe center; justify-content:safe center; }
+.stage > .phone { flex:none; }
+
 /* No phone yet: a calm panel with the three ways to connect */
 .stagepane > .stage { padding-left:20px; padding-right:20px; }
 .stage:not([data-state="live"]) { background:var(--surface); box-shadow:inset 0 0 0 1px var(--line); justify-content:flex-start; padding-left:8%; padding-right:8%; }

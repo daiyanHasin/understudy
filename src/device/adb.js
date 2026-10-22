@@ -147,7 +147,10 @@ async function readDevices() {
     if (bootedSeen.has(d.serial)) d.booted = true;
     else {
       try { d.booted = (await shell(d.serial, ["getprop", "sys.boot_completed"], { timeout: 5000 })).trim() === "1"; }
-      catch (_) {}
+      // A real phone that adb lists as "device" has finished starting. When getprop is slow (just
+      // after "Allow USB debugging", or while screenshots keep the USB link busy) it used to show
+      // as "starting..." and the Record tab never opened its screen. Only emulators really boot here.
+      catch (_) { if (!d.emulator) d.booted = true; }
       if (d.booted) bootedSeen.add(d.serial);
     }
     if (d.emulator) {

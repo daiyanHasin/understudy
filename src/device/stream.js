@@ -24,13 +24,26 @@
  */
 const { spawn } = require("child_process");
 const state = require("../core/state");
-const { adb, checkSerial, isWifi } = require("./adb");
+const { adb, run, checkSerial, isWifi } = require("./adb");
 const screen = require("./screen");
 
 const SHORT_SIDE = 720;            // video size: the short side, the long side follows the screen
 const CHANGE_BYTES = 1200;         // more than this in one tick of changed pictures = the screen changed
 const TICK_MS = 200;
 const active = new Map();          // serial -> { child, stop() }
+const cleaning = new Map();        // serial -> promise: the phone-side recording of a stopped stream is being ended
+
+/* Killing `adb exec-out` on the PC does not always end `screenrecord` on the phone: on a still
+   screen it writes nothing, so it never notices and runs on for up to 3 minutes. A new stream next
+   to it makes the phone run two video encoders over one USB link; many phones refuse the second
+   one or stall adb, and the phone seems to disconnect. So the old one is ended on the phone first. */
+function endOnPhone(serial) {
+  const p = run(adb(), ["-s", serial, "shell", "pkill -INT -f 'screenrecor[d] --output-format=h264' || true"], { timeout: 4000 })
+    .catch(() => {})
+    .then(() => { if (cleaning.get(serial) === p) cleaning.delete(serial); });
+  cleaning.set(serial, p);
+  return p;
+}
 
 const even16 = v => Math.max(16, Math.round(v / 16) * 16);   // video encoders want multiples of 16
 
@@ -74,7 +87,21 @@ function pipe(serial, size, req, res, headers) {
   const dw = Math.round(Number(size.dw)), dh = Math.round(Number(size.dh));
   if (!(dw >= 100 && dw <= 8000 && dh >= 100 && dh <= 8000)) { const e = new Error("Unknown screen size"); e.status = 400; throw e; }
   stop(serial);                                            // one stream per device
+  const ready = cleaning.get(serial) || Promise.resolve();
+  ready.then(() => {
+    if (res.destroyed || res.writableEnded) return;        // the window gave up while the phone was cleaned up
+    start(serial, dw, dh, res, headers);
+  }).catch(e => {                                           // never an unhandled rejection: that would stop the server
+    try {
+      if (!res.headersSent) res.writeHead(502, Object.assign({}, headers, { "Content-Type": "application/json; charset=utf-8" }));
+      res.end(JSON.stringify({ error: "No live video from this device: " + (e && e.message || e) }));
+    } catch (_) {}
+  });
+}
 
+function start(serial, dw, dh, res, headers) {
+  if (state.busy) { res.writeHead(409, Object.assign({}, headers, { "Content-Type": "application/json; charset=utf-8" }));
+                    return res.end(JSON.stringify({ error: "A test is running" })); }
   const v = videoSize(dw, dh);
   const rate = isWifi(serial) ? 3000000 : 8000000;
   const child = spawn(adb(), ["-s", serial, "exec-out", "screenrecord", "--output-format=h264",
@@ -93,7 +120,9 @@ function pipe(serial, size, req, res, headers) {
   function finish() {
     if (ended) return; ended = true;
     clearInterval(tick);
+    const running = child.exitCode === null && child.signalCode === null;
     try { child.kill(); } catch (_) {}
+    if (running) endOnPhone(serial);                       // see endOnPhone() above
     if (active.get(serial) && active.get(serial).child === child) active.delete(serial);
     try { res.end(); } catch (_) {}
   }
@@ -101,6 +130,9 @@ function pipe(serial, size, req, res, headers) {
   s.size = { w: dw, h: dh };
 
   child.stdout.on("data", chunk => {
+    // Chunks already read from adb still arrive after finish() ended the response. Writing them
+    // then throws "write after end", which crashed the whole server (and with it the phone link).
+    if (ended || res.destroyed || res.writableEnded) return;
     if (!started) {
       started = true;
       const h = Object.assign({}, headers, { "X-Video-W": v.w, "X-Video-H": v.h,
@@ -111,6 +143,8 @@ function pipe(serial, size, req, res, headers) {
     res.write(chunk);
   });
   child.stderr.on("data", d => { errText = (errText + d).slice(-400); });
+  child.stdout.on("error", () => {});
+  res.on("error", () => {});                                // a closed window is not a server error
   child.on("error", e => { errText = e.message; });
   child.on("close", () => {
     if (!started && !res.headersSent) {

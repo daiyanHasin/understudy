@@ -62,7 +62,7 @@ async function mdnsWorks() {
    opts.canRestart() says nothing is using the device. */
 async function ensureMdns(opts) {
   if (await mdnsWorks()) return true;
-  if (!opts || !opts.canRestart || !opts.canRestart()) return false;
+  if (!opts || !opts.canRestart || !(await opts.canRestart())) return false;
   try { if (opts.beforeRestart) opts.beforeRestart(); } catch (_) {}
   try { await android.run(android.adb(), ["kill-server"], { timeout: 10000 }); } catch (_) {}
   try { await android.run(android.adb(), ["start-server"], { timeout: 20000 }); } catch (_) {}
