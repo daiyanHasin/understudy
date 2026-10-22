@@ -457,9 +457,12 @@ var Rec = (function () {
     var nav = document.querySelector("#tab-record .navbar");
     for (var pass = 0; pass < 2; pass++) {             // a narrower phone can wrap the buttons below it: measure again
       var top = st.getBoundingClientRect().top + (window.scrollY || 0);
-      var below = (nav ? nav.offsetHeight + 10 : 0) + 14;
+      // the device buttons can sit under the phone or beside it (design 2.1): only buttons underneath take height
+      var navBelow = nav && nav.offsetParent && nav.getBoundingClientRect().top >= st.getBoundingClientRect().bottom - 1;
+      var navSide = nav && nav.offsetParent && !navBelow ? nav.offsetWidth + 10 : 0;
+      var below = (navBelow ? nav.offsetHeight + 10 : 0) + 14;
       var availH = Math.max(360, window.innerHeight - top - 40 - 34 - 16 - below);   // stage bar, hint, phone frame, buttons
-      var availW = Math.max(300, Math.min(window.innerWidth * 0.6, 760) - 24 - 16);
+      var availW = Math.max(300, Math.min(window.innerWidth * 0.6, 760) - 24 - 16 - navSide);
       var h = Math.min(availH, availW * c.height / c.width);
       c.style.height = Math.round(h) + "px";
       c.style.width = Math.round(h * c.width / c.height) + "px";

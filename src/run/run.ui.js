@@ -114,7 +114,7 @@ function renderQueue() {
   var box = $("queue");
   box.innerHTML = "";
   if (!queue.length) {
-    box.appendChild(el("div", "empty", "Nothing selected yet. Tick flows on the left."));
+    box.appendChild(el("div", "empty", "Nothing in the queue yet. Press Add flows to choose some."));
     return;
   }
   queue.forEach(function (f, i) {
