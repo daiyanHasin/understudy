@@ -8,7 +8,7 @@
 
 *Show it once. It performs a thousand times.*
 
-[![Version](https://img.shields.io/badge/version-2.0.0-17191e)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-2.3.0-17191e)](CHANGELOG.md)
 [![Platform](https://img.shields.io/badge/platform-Windows-17191e)](#requirements)
 [![Node](https://img.shields.io/badge/node-%E2%89%A518-17191e)](https://nodejs.org)
 [![Runs on Maestro](https://img.shields.io/badge/runs%20on-Maestro%20CLI-a97a2c)](https://maestro.mobile.dev)

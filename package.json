@@ -1,6 +1,6 @@
 {
   "name": "understudy",
-  "version": "2.0.0",
+  "version": "2.3.0",
   "description": "Record Android tests by clicking, make them data-driven with Excel, and run them with Maestro. Runs 100% locally.",
   "private": true,
   "license": "UNLICENSED",

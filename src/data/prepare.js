@@ -270,6 +270,12 @@ async function prepareNow(log) {
 
   const written = new Set();
   let sheetCount = 0;
+  // Scripts/<Excel>/<Sheet>.js is named after the file and sheet only. Two Excel files with
+  // the same name in different folders (or two sheets that differ only in punctuation) would
+  // write the same script, and the second silently replaced the first. First one wins now,
+  // in a fixed order, and the other is reported.
+  files.sort((a, b) => a.localeCompare(b));
+  const owner = new Map();              // lower-case script path -> "file [sheet]" that owns it
 
   for (const file of files) {
     const rel      = path.relative(P.root, file).split(path.sep).join("/");
@@ -287,6 +293,14 @@ async function prepareNow(log) {
       const name = safe(sheet);
       const jsonOut = path.join(P.jsonData, baseName, name + ".json");
       const jsOut   = path.join(P.scripts, baseName, name + ".js");
+      const key = jsOut.toLowerCase(), mine = rel + " [" + sheet + "]";
+      if (owner.has(key)) {
+        const msg = mine + " has the same name as " + owner.get(key) +
+                    ": both would become Scripts/" + baseName + "/" + name + ".js. Rename one of them. Skipped.";
+        errors.push(msg); log("  [ERROR] " + msg + "\n");
+        continue;
+      }
+      owner.set(key, mine);
       fs.mkdirSync(path.dirname(jsonOut), { recursive: true });
       fs.mkdirSync(path.dirname(jsOut),   { recursive: true });
       fs.writeFileSync(jsonOut, JSON.stringify(rows, null, 2));

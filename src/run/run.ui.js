@@ -276,6 +276,7 @@ function summarize() {
 
 /* ---------- Actions ---------- */
 async function prepareData() {
+  showRunPanels();
   $("log").textContent = "";
   setRunning(true);
   $("status").textContent = "Preparing data\u2026";
@@ -422,10 +423,17 @@ function openReport() {
   else toast("Run a flow or pick a report first.", "err");
 }
 
+// One text node per chunk, oldest dropped: `textContent += text` copied the whole log on
+// every line, so a long suite made the window slower and slower.
+var LOG_MAX_CHUNKS = 4000;
+function showRunPanels() { var t = $("tab-run"); if (t && !t.classList.contains("ran")) t.classList.add("ran"); }
 function appendLog(text) {
+  showRunPanels();
   var e = $("log");
-  e.textContent += text;
-  e.scrollTop = e.scrollHeight;
+  var stick = e.scrollHeight - e.scrollTop - e.clientHeight < 40;     // only follow if already at the bottom
+  e.appendChild(document.createTextNode(text));
+  while (e.childNodes.length > LOG_MAX_CHUNKS) e.removeChild(e.firstChild);
+  if (stick) e.scrollTop = e.scrollHeight;
 }
 
 /* ---------- Live run panel ---------- */
@@ -436,6 +444,7 @@ function fmtDur(ms) {
   return m + "m " + (r < 10 ? "0" : "") + r + "s";
 }
 function liveStart(total) {
+  showRunPanels();
   stepsByJob = {};
   live.start = Date.now(); live.done = 0; live.total = total; live.job = null;
   clearInterval(live.timer);
@@ -524,6 +533,8 @@ es.onmessage = function (e) {
     resultOrder = d.jobs.map(function (j) { jobLabels[j.id] = j.label; jobInfo[j.id] = { flow: j.flow, row: j.row }; return j.id; });
     renderResults();
     liveStart(d.jobs.length);
+    // A run this window did not start (window reloaded or reopened while it runs): show it as running
+    if (!running) { setRunning(true); $("status").textContent = "Running\u2026"; }
   }
   else if (d.type === "start") {
     results[d.id] = { status: "running" };

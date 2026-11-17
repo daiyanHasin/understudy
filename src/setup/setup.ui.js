@@ -36,42 +36,68 @@ function runDoctor() {
   fetch("/api/doctor").then(function (r) { return r.json(); }).then(function (d) {
     box.innerHTML = "";
     var missing = 0;
+    var list = el("div", "checks");
+    var ICON = {
+      ok:  '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+      bad: '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+      opt: '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg>'
+    };
+    var firstMissing = true;
     (d.checks || []).forEach(function (c) {
-      if (!c.ok && !c.optional) missing++;
-      var row = el("div", "check " + (c.ok ? "ok" : c.optional ? "opt" : "bad"));
-      var mark = el("span", "mark", c.ok ? "\u2713" : c.optional ? "\u2013" : "\u2717");
-      mark.setAttribute("aria-label", c.ok ? "Ready" : c.optional ? "Optional" : "Needs attention");
+      var kind = c.ok ? "ok" : c.optional ? "opt" : "bad";
+      if (kind === "bad") missing++;
+      // One line: state, name, version or reason, the word. Everything else opens on click.
+      var row = el("div", "check2 " + kind);
+      var mark = el("span", "cmark"); mark.innerHTML = ICON[kind];
       row.appendChild(mark);
-      var body = el("div", "cbody");
-      var head = el("div", "chead2");
-      head.appendChild(el("b", "", c.label));
-      if (c.detail) head.appendChild(el("span", "dim", c.detail));
-      body.appendChild(head);
-      if (c.fix) body.appendChild(el("div", "fix", c.fix));
+      row.appendChild(el("span", "cname", c.label));
+      row.appendChild(el("span", "cdet", c.ok ? (c.detail || "") : ""));
+      row.appendChild(el("span", "cstate", c.ok ? "Ready" : c.optional ? "Optional" : (c.detail || "Missing")));
+      var chev = el("span", "cchev"); chev.innerHTML = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg>';
+      var more = el("div", "cmore"), inner = el("div", "");
+      if (c.fix) inner.appendChild(el("p", "", c.fix));
+      var acts = el("div", "cacts");
+      // The first thing that is missing gets the screen's one gold button; the others are ordinary buttons
+      var lead = kind === "bad" && firstMissing && (c.action === "adb" || c.action === "connect");
       if (c.action === "adb") {
-        var ab = el("button", "btn solid", "Install phone tools");
+        var ab = el("button", "btn" + (lead ? " solid" : ""), "Install phone tools");
         var msg = el("span", "fhint", "");
         ab.onclick = function () { installPhoneTools(ab, msg); };
-        body.appendChild(ab); body.appendChild(msg);
+        acts.appendChild(ab); acts.appendChild(msg);
       }
       if (c.action === "android") {
         var ib = el("button", "btn", "Install virtual-device tools\u2026");
         ib.onclick = installAndroid;
-        body.appendChild(ib);
+        acts.appendChild(ib);
       }
       if (c.action === "connect") {
-        var cb = el("button", "btn", "Connect device");
+        var cb = el("button", "btn" + (lead ? " solid" : ""), "Connect device");
         cb.onclick = function () { Connect.open(); };
-        body.appendChild(cb);
+        acts.appendChild(cb);
       }
       if (c.link) {
         var a = el("a", "", "Open instructions");
         a.href = c.link; a.target = "_blank"; a.rel = "noopener noreferrer";
-        body.appendChild(a);
+        acts.appendChild(a);
       }
-      row.appendChild(body);
-      box.appendChild(row);
+      if (acts.childNodes.length) inner.appendChild(acts);
+      var hasMore = inner.childNodes.length > 0;
+      if (hasMore) { more.appendChild(inner); row.appendChild(chev); row.appendChild(more); }
+      else { row.appendChild(el("span", "")); row.style.cursor = "default"; }
+      if (lead) firstMissing = false;
+      if (kind === "bad" && hasMore) row.classList.add("open");        // what is missing explains itself; the rest stays one line
+      row.setAttribute("role", "button"); row.tabIndex = hasMore ? 0 : -1;
+      row.setAttribute("aria-expanded", row.classList.contains("open") ? "true" : "false");
+      function toggle(e) {
+        if (!hasMore || (e.target.closest && e.target.closest("button, a"))) return;
+        row.classList.toggle("open");
+        row.setAttribute("aria-expanded", row.classList.contains("open") ? "true" : "false");
+      }
+      row.addEventListener("click", toggle);
+      row.addEventListener("keydown", function (e) { if ((e.key === "Enter" || e.key === " ") && e.target === row) { e.preventDefault(); toggle(e); } });
+      list.appendChild(row);
     });
+    box.appendChild(list);
     $("doctorSum").textContent = missing ? missing + " item(s) need attention before you can record." : "Everything needed is ready.";
     $("doctorSum").className = "status " + (missing ? "bad" : "good");
   }).catch(function () {

@@ -37,7 +37,7 @@ var AI = (function () {
       steps.appendChild(r);
     }
     var inst = null;
-    if (!s.installed) { inst = el("button", "btn mini solid", "Install Ollama"); inst.onclick = install; }
+    if (!s.installed) { inst = el("button", "btn mini", "Install Ollama"); inst.onclick = install; }
     stepRow(s.installed, "1. Ollama (free, local model runner)", s.running ? "running" : s.installed ? "installed, not running: start it from the Start menu" : "about 200 MB", inst);
 
     var pulling = s.pull && !s.pull.done;
@@ -47,7 +47,7 @@ var AI = (function () {
       var sel = document.createElement("select");
       s.choices.forEach(function (c) { var o = document.createElement("option"); o.value = c.id; o.textContent = c.label; sel.appendChild(o); });
       sel.value = s.model;
-      var go = el("button", "btn mini solid", "Download");
+      var go = el("button", "btn mini", "Download");
       go.onclick = function () { api("/api/ai/pull", { model: sel.value }).then(function () { refresh(); pollPull(); }).catch(function (e) { toast(e.message, "err"); }); };
       dl.appendChild(sel); dl.appendChild(go);
     }
@@ -57,7 +57,7 @@ var AI = (function () {
 
     var tg = null;
     if (s.hasModel) {
-      tg = el("button", "btn mini" + (s.enabled ? "" : " solid"), s.enabled ? "Turn off" : "Turn on");
+      tg = el("button", "btn mini", s.enabled ? "Turn off" : "Turn on");
       tg.onclick = function () { api("/api/ai/enable", { on: !s.enabled }).then(refresh); };
     }
     stepRow(s.enabled && s.hasModel, "3. Helper", s.enabled ? "on: the AI tab on Record is ready" : "off", tg);
@@ -87,7 +87,7 @@ var AI = (function () {
     ta.placeholder = "e.g. After login, open Settings, turn on Dark mode and check \u201CDark theme\u201D is visible";
     box.appendChild(ta);
     var bar = el("div", "racts");
-    var go = el("button", "btn mini solid", "Write the flow"); go.id = "aiGo";
+    var go = el("button", "btn mini", "Write the flow"); go.id = "aiGo";
     go.onclick = generate;
     bar.appendChild(go); box.appendChild(bar);
     var out = el("div", ""); out.id = "aiOut"; box.appendChild(out);
@@ -107,7 +107,7 @@ var AI = (function () {
       var pre = document.createElement("textarea"); pre.className = "yaml small"; pre.rows = 12; pre.value = d.yaml; pre.spellcheck = false;
       out.appendChild(pre);
       var bar = el("div", "racts");
-      var ap = el("button", "btn mini solid", "Apply to the flow");
+      var ap = el("button", "btn mini", "Apply to the flow");
       ap.onclick = function () { Rec.setYaml(pre.value).then(function (ok) { if (ok) { toast("Applied. Check the steps, then save.", "ok"); Rec.panel("flow"); } }); };
       var cp = el("button", "btn mini", "Discard"); cp.onclick = function () { out.innerHTML = ""; };
       bar.appendChild(ap); bar.appendChild(cp); out.appendChild(bar);

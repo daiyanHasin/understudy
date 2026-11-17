@@ -99,7 +99,16 @@ const ctx = {
 if (process.argv.includes("--list-routes")) { console.log(router.list().join("\n")); process.exit(0); }
 
 /* ---------- Server ---------- */
-const server = http.createServer(async (req, res) => {
+// A request must never be able to stop the server: anything a handler throws (also
+// synchronously, e.g. a malformed %-escape in the address) becomes an error answer.
+const server = http.createServer((req, res) => {
+  handle(req, res).catch(e => {
+    if (!res.headersSent) fail(res, e);
+    else { try { res.end(); } catch (_) {} }
+  });
+});
+
+async function handle(req, res) {
   // 1. Only requests addressed to this machine (blocks DNS rebinding)
   if (!security.hostOk(req)) { res.writeHead(403, security.headers.plain("text/plain")); return res.end("Forbidden host"); }
   let u;
@@ -114,7 +123,9 @@ const server = http.createServer(async (req, res) => {
 
   // Report assets (images/css inside a report) are loaded by the sandboxed report frame,
   // which has no cookies. They are only readable, never executable here.
-  const reportAsset = req.method === "GET" && p.startsWith("/reports/") && !/\.html?$/i.test(p);
+  // Decided on the DECODED name and by a list of allowed types: "x.htm%6c", "x.html." or
+  // "x.html::$DATA" must not get a report page past the session check.
+  const reportAsset = req.method === "GET" && p.startsWith("/reports/") && files.isPublicReportAsset(p);
   if (reportAsset) return files.serveReport(req, res, p);
 
   // 3. Everything else needs this window's session; changes also need the token header
@@ -127,12 +138,8 @@ const server = http.createServer(async (req, res) => {
 
   const fn = router.find(req.method, p);
   if (!fn) return json(res, 404, { error: "Not found" });
-  try { await fn(req, res, u); }
-  catch (e) {
-    if (!res.headersSent) fail(res, e);
-    else { try { res.end(); } catch (_) {} }
-  }
-});
+  await fn(req, res, u);
+}
 
 server.on("error", e => {
   if (e.code === "EADDRINUSE") {
@@ -165,7 +172,10 @@ server.listen(PORT, "127.0.0.1", () => {
   if (HIDDEN) startLogFile();
   console.log(" Project     : " + P.root);
   require("./src/data/prepare").prepareData(() => {})
-    .then(r => console.log(" Test data   : " + r.files + " Excel file(s), " + r.sheets + " sheet(s) prepared"))
+    .then(r => {
+      console.log(" Test data   : " + r.files + " Excel file(s), " + r.sheets + " sheet(s) prepared");
+      (r.errors || []).forEach(e => console.log("   problem   : " + e));
+    })
     .catch(e => console.log(" Test data   : could not prepare (" + e.message + ")"));
   console.log("");
   console.log("=================================================");

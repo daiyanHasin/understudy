@@ -1,5 +1,35 @@
 # Changelog
 
+## Understudy 2.3.0 — 2026-11-15
+
+### Design: Bench
+- New look, from the design system: a cool neutral panel, hairlines, one gold button per screen. Four type sizes (12, 13, 15, 20), two corner radii, three button styles. IBM Plex Sans and Mono, bundled.
+- A second style, **Studio** (graphite sidebar, panels with depth), switched with the Style button at the bottom of the sidebar. Light and dark work in both.
+- New logo: a U with a gold dot on its shorter arm (`assets/logo.svg`, icons and `understudy.ico`).
+- Record: the phone and the app are one control in the top bar; its popover holds the device list, app, Fresh data and Launch app. The three stage switches are in a View menu. "Add a step" is a search field over one list (arrows and Enter work).
+- Run flows: the queue is the whole screen until a run or Prepare Data has something to show.
+- Setup: one line per check; what is missing opens by itself, the rest opens on click. The notes on the right fold away.
+- Removed: the small labels above titles, the "Local user" placeholder, the welcome dialog at first start, text glyphs used as icons.
+
+### Motion
+- Buttons sink to 95% when pressed and spring back.
+- A list pushed past its first or last row gives a little, resists and springs back.
+- Numbers count to their new value. Screens, panels and menus ease in. All of it is off when the PC asks for reduced motion.
+
+## Understudy 2.2.5 — 2026-11-15
+
+### Fixed
+- **A malformed address could stop Understudy.** `/reports/%zz.png` (no session needed) or `/runs/%zz.png` made the server exit, ending a running test. Any error in a request is now answered, never fatal.
+- **Report pages could be read without the session** by disguising the file type (`r.htm%6c`). Only images, styles, scripts and fonts inside `Reports/` are public now, decided on the decoded name.
+- **Two Excel files with the same name** in different `TestData/` folders, or two sheets that differ only in punctuation, wrote the same data script and one silently replaced the other. Prepare Data now keeps the first, skips the other and says so; creating such a file or sheet is refused.
+- **New flows must have a name Run accepts** (English letters, numbers, spaces, `. _ - /`). Before, the editor created `login & test.yaml` and Run refused it.
+- **Nothing is recorded as a failed test when Maestro or the phone is missing.** The run is not started and one sentence says why.
+- **Older runs open their own Maestro report.** Each run keeps a copy in `Reports/_runs/<run>/`; before, every run in Insights opened the newest report of that flow.
+- **Reloading or reopening the window during a run** shows the run (queue, results so far, current steps) instead of "Idle".
+- **The console no longer slows down long suites** (it kept copying the whole log on every line).
+- **Backups:** Excel keeps the last 20 saves per file (was one, overwritten); flow backups are limited to the last 20 per flow (were unlimited).
+- Version numbers agree again (`package.json`, `package-lock.json`, `app.config.json`, README).
+
 ## Unreleased
 
 ### Screen

@@ -79,6 +79,11 @@ function resolveNewExcel(folder, name) {
   const full = path.join(dir, name + ".xlsx");
   if (!full.startsWith(P.root + path.sep)) throw new Error("Invalid folder");
   if (fs.existsSync(full)) throw new Error("A file with that name already exists in that folder.");
+  // The data scripts are named after the file only (Scripts/<name>/<Sheet>.js), so the name
+  // must be unique in the whole of TestData/, not just in its folder.
+  const clash = scanExcel().find(f => f.name.toLowerCase() === (name + ".xlsx").toLowerCase());
+  if (clash) throw new Error("A file named " + clash.name + " already exists in " + clash.folder +
+                             ". Excel file names must be different, even in different folders.");
   return { dir, full };
 }
 
@@ -124,7 +129,23 @@ function friendlyWriteError(err) {
 function backupFile(file) {
   fs.mkdirSync(P.excelBackups, { recursive: true });
   const rel = path.relative(P.testData, file).replace(/[\\/]/g, "__").replace(/\.xlsx$/i, "");
-  fs.copyFileSync(file, path.join(P.excelBackups, rel + ".bak.xlsx"));
+  // One backup per save (before 2.2.5 a single file was overwritten every time, so only the
+  // last save could be undone). The newest KEEP_BACKUPS per Excel file are kept.
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  fs.copyFileSync(file, path.join(P.excelBackups, rel + "." + stamp + ".bak.xlsx"));
+  pruneBackups(P.excelBackups, rel + ".", ".bak.xlsx");
+}
+
+const KEEP_BACKUPS = 20;
+/** Delete all but the newest KEEP_BACKUPS files named <prefix><timestamp><suffix> in dir. */
+function pruneBackups(dir, prefix, suffix) {
+  try {
+    const mine = fs.readdirSync(dir)
+      .filter(f => f.startsWith(prefix) && f.endsWith(suffix) &&
+                   /^\d{4}-\d{2}-\d{2}T[\d-]+Z$/.test(f.slice(prefix.length, f.length - suffix.length)))
+      .sort();                                   // ISO timestamps sort by time
+    mine.slice(0, Math.max(0, mine.length - KEEP_BACKUPS)).forEach(f => { try { fs.unlinkSync(path.join(dir, f)); } catch (_) {} });
+  } catch (_) {}
 }
 
 /* ---------- Sheet name rules ---------- */
@@ -137,6 +158,13 @@ function checkSheetName(name, existing) {
   if (existing.some(n => n.toLowerCase() === name.toLowerCase()))
     throw new Error("A sheet with that name already exists.");
   return name;
+}
+
+// "Login Data" and "Login_Data" would both become Scripts/<Excel>/Login_Data.js
+const scriptName = s => String(s).trim().replace(/[^a-zA-Z0-9_-]/g, "_").toLowerCase();   // same rule as prepare.js
+function checkSheetScript(name, existing) {
+  const other = existing.find(n => scriptName(n) === scriptName(name));
+  if (other) throw new Error("That name is too close to the sheet \u201C" + other + "\u201D: both would use the same data script. Choose a different name.");
 }
 
 function parseHeaders(s) {
@@ -307,6 +335,7 @@ async function addSheetToExcel(file, name, headers) {
       const wb = new ExcelJS.Workbook();
       await wb.xlsx.readFile(file);
       const sheet = checkSheetName(name, wb.worksheets.map(w => w.name));
+      checkSheetScript(sheet, wb.worksheets.map(w => w.name));
       const ws = wb.addWorksheet(sheet);
       if (headers.length) {
         ws.columns = headers.map(h => ({ width: Math.max(14, h.length + 4) }));
@@ -316,6 +345,7 @@ async function addSheetToExcel(file, name, headers) {
     } else if (XLSX) {
       const wb = XLSX.readFile(file, { cellStyles: true, cellDates: true });
       const sheet = checkSheetName(name, wb.SheetNames);
+      checkSheetScript(sheet, wb.SheetNames);
       XLSX.utils.book_append_sheet(wb,
         XLSX.utils.aoa_to_sheet(headers.length ? [headers] : [[]]), sheet);
       XLSX.writeFile(wb, file);
@@ -331,6 +361,7 @@ module.exports = {
   scanExcel,
   resolveExcel,
   resolveNewExcel,
+  pruneBackups,
   checkSheetName,
   parseHeaders,
   readExcel,

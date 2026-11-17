@@ -55,8 +55,24 @@ function servePublic(req, res, p) {
   return false;
 }
 
+/** decodeURIComponent that answers 400 instead of throwing on a malformed %-escape. */
+function decodePath(s) {
+  try { return decodeURIComponent(s); }
+  catch (_) { const e = new Error("Bad address"); e.status = 400; throw e; }
+}
+
+// Files a sandboxed report frame (no cookies) may load without the session.
+// Report pages themselves (.html) are never in this list.
+const PUBLIC_REPORT_ASSET = /\.(png|jpe?g|gif|webp|svg|css|js|woff2?)$/i;
+function isPublicReportAsset(p) {
+  let rel;
+  try { rel = decodeURIComponent(p.slice("/reports/".length)); } catch (_) { return false; }
+  return PUBLIC_REPORT_ASSET.test(rel) && !/[:\0]/.test(rel);
+}
+
 function serveReport(req, res, p) {
-  const rel = decodeURIComponent(p.slice("/reports/".length));
+  const rel = decodePath(p.slice("/reports/".length));
+  if (/[:\0]/.test(rel)) { res.writeHead(403); return res.end(); }
   const REPORTS_DIR = P.reports;
   const filePath = path.resolve(REPORTS_DIR, rel);
   if (!filePath.startsWith(REPORTS_DIR + path.sep)) { res.writeHead(403); return res.end(); }
@@ -71,7 +87,9 @@ function serveReport(req, res, p) {
         fs.writeFile(filePath, data, () => {});
       } catch (_) {}
     }
-    const types = { ".html": "text/html; charset=utf-8", ".png": "image/png", ".jpg": "image/jpeg",
+    const types = { ".html": "text/html; charset=utf-8", ".htm": "text/html; charset=utf-8", ".png": "image/png",
+                    ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp",
+                    ".svg": "image/svg+xml", ".woff2": "font/woff2", ".woff": "font/woff",
                     ".css": "text/css", ".js": "application/javascript", ".json": "application/json" };
     res.writeHead(200, security.headers.report(types[path.extname(filePath).toLowerCase()] || "application/octet-stream"));
     res.end(data);
@@ -79,7 +97,7 @@ function serveReport(req, res, p) {
 }
 
 function serveRunShot(req, res, p) {
-  const rel = p.slice("/runs/".length).split("/").map(decodeURIComponent).join(path.sep);
+  const rel = p.slice("/runs/".length).split("/").map(decodePath).join(path.sep);
   const filePath = path.resolve(P.runs, rel);
   if (!filePath.startsWith(P.runs + path.sep) || !/\.png$/i.test(filePath)) { res.writeHead(403); return res.end(); }
   fs.readFile(filePath, (err, data) => {
@@ -89,4 +107,4 @@ function serveRunShot(req, res, p) {
   });
 }
 
-module.exports = { servePublic, sendStatic, sendIndex, serveReport, serveRunShot };
+module.exports = { servePublic, sendStatic, sendIndex, serveReport, serveRunShot, isPublicReportAsset };

@@ -1811,7 +1811,10 @@ var Rec = (function () {
     row.appendChild(body);
 
     var mv = el("div", "rmove");
-    var up = el("button", "btn mini", "\u25B2"), dn = el("button", "btn mini", "\u25BC"), del = el("button", "btn mini ghost", "\u00d7");
+    var up = el("button", "btn mini icon quiet"), dn = el("button", "btn mini icon quiet"), del = el("button", "btn mini icon ghost");
+    up.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 14l5-5 5 5"/></svg>';
+    dn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg>';
+    del.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
     up.title = "Move up"; dn.title = "Move down"; del.title = "Delete step";
     up.setAttribute("aria-label", "Move step up"); dn.setAttribute("aria-label", "Move step down"); del.setAttribute("aria-label", "Delete step");
     up.disabled = idx === 0; dn.disabled = idx === list.length - 1;

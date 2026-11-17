@@ -23,7 +23,22 @@ const SERIAL_RE = /^[A-Za-z0-9._:-]{1,64}$/;
 /* ---------- SSE ---------- */
 const sseClients = new Set();
 
+/*
+ * A window that is reloaded or reopened while a run is going used to show "Idle": the events
+ * it missed were gone. The run's state events are kept (queue, results so far, the test that
+ * is running and its steps) and sent to every window that connects before the run is done.
+ */
+let replay = null;
+function remember(obj) {
+  if (obj.type === "queue") { replay = [obj]; return; }
+  if (!replay) return;
+  if (obj.type === "done") { replay = null; return; }
+  if (obj.type === "start") replay = replay.filter(e => e.type !== "step" && e.type !== "start");   // steps of the current test only
+  if (obj.type === "start" || obj.type === "step" || obj.type === "result" || obj.type === "skipped") replay.push(obj);
+}
+
 function emit(obj) {
+  remember(obj);
   const payload = "data: " + JSON.stringify(obj) + "\n\n";
   for (const c of sseClients) {
     try { c.write(payload); }
@@ -34,7 +49,13 @@ function emit(obj) {
 const strip = s => s.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
 function broadcast(text) { emit({ type: "log", text: strip(String(text)) }); }
 
-function addSseClient(res) { sseClients.add(res); }
+function addSseClient(res) {
+  sseClients.add(res);
+  if (replay) {
+    try { for (const e of replay) res.write("data: " + JSON.stringify(e) + "\n\n"); }
+    catch (_) { sseClients.delete(res); }
+  }
+}
 function removeSseClient(res) { sseClients.delete(res); }
 
 /* ---------- Flow discovery ---------- */
@@ -77,6 +98,30 @@ function listReports() {
     .map(f => ({ name: f, time: fs.statSync(path.join(P.reports, f)).mtimeMs }))
     .sort((a, b) => b.time - a.time)
     .map(r => r.name);
+}
+
+/* ---------- Checks before a run ---------- */
+/** Is the `maestro` command on PATH? A file lookup: no JVM start, so it costs nothing before a run. */
+function maestroOnPath() {
+  const exts = process.platform === "win32"
+    ? String(process.env.PATHEXT || ".COM;.EXE;.BAT;.CMD").split(";").filter(Boolean).concat([""])
+    : [""];
+  const dirs = String(process.env.PATH || "").split(path.delimiter).filter(Boolean);
+  for (const d of dirs) {
+    for (const x of exts) {
+      try { if (fs.statSync(path.join(d.replace(/^"|"$/g, ""), "maestro" + x)).isFile()) return true; } catch (_) {}
+    }
+  }
+  return false;
+}
+
+/** Keep the newest `keep` sub-folders of dir (their names are run start times). */
+function pruneRunFolders(dir, keep) {
+  try {
+    const all = fs.readdirSync(dir, { withFileTypes: true }).filter(e => e.isDirectory() && /^\d+$/.test(e.name))
+      .map(e => e.name).sort((a, b) => Number(a) - Number(b));
+    all.slice(0, Math.max(0, all.length - keep)).forEach(n => { try { fs.rmSync(path.join(dir, n), { recursive: true, force: true }); } catch (_) {} });
+  } catch (_) {}
 }
 
 /* ---------- Process control ---------- */
@@ -213,6 +258,10 @@ async function runFlows(jobs, stopOnFail, meta) {
   const results = [];
   const REPORTS_DIR = P.reports, RUNS_DIR = P.runs;
   const shotDir = path.join(REPORTS_DIR, "_shots", String(runStarted));
+  // Reports/<flow>.html is replaced by every run (it is "the latest report of this flow").
+  // Each run also keeps its own copy here, and the run history links to that copy. Before
+  // 2.2.5 an older run in Insights opened the report of the newest run.
+  const keepDir = path.join(REPORTS_DIR, "_runs", String(runStarted));
   fs.mkdirSync(REPORTS_DIR, { recursive: true });
   try { fs.rmSync(RUNS_DIR, { recursive: true, force: true }); } catch (_) {}
   emit({ type: "queue", jobs: jobs.map(j => ({ id: j.id, label: j.label, flow: j.flow, row: j.row })) });
@@ -255,6 +304,15 @@ async function runFlows(jobs, stopOnFail, meta) {
       finally { if (tmp) partial.remove(tmp.full); }
       // Maestro's own report needs Bootstrap from the internet: make it self-contained (report.js)
       try { report.fixMaestroReport(reportPath); } catch (_) {}
+      let reportUrl = null;
+      if (fs.existsSync(reportPath)) {
+        reportUrl = "/reports/" + encodeURIComponent(reportName);
+        try {
+          fs.mkdirSync(keepDir, { recursive: true });
+          fs.copyFileSync(reportPath, path.join(keepDir, reportName));
+          reportUrl = "/reports/_runs/" + runStarted + "/" + encodeURIComponent(reportName);
+        } catch (_) {}                                   // no copy: link to the latest one, as before
+      }
       const stopped = state.stopRequested;
       let shot = code !== 0 ? live.failureScreenshot(debugDir) : null;
       // .runs/ is cleared by the next run: keep failure screenshots with the reports
@@ -270,7 +328,7 @@ async function runFlows(jobs, stopOnFail, meta) {
         ok: code === 0 && !stopped,
         stopped,
         reportName,
-        report: fs.existsSync(reportPath) ? "/reports/" + encodeURIComponent(reportName) : null,
+        report: reportUrl,
         duration: Date.now() - started,
         failedStep: job.failedStep || null,
         screenshot: shot ? shotUrl(shot) : null,
@@ -306,6 +364,7 @@ async function runFlows(jobs, stopOnFail, meta) {
     catch (e) { broadcast("[WARN] Could not write the run report: " + e.message + "\n"); }
     // Older Maestro reports in Reports/ (from before 2.0.1) get the same offline styling
     setImmediate(() => { try { report.fixAllMaestroReports(); } catch (_) {} });
+    pruneRunFolders(path.join(REPORTS_DIR, "_runs"), 300);    // as many as the history keeps
     try { history.add(run); }
     catch (e) { broadcast("[WARN] Could not save run history: " + e.message + "\n"); }
     emit({ type: "done", ok: results.every(r => r.ok), passed, failed, skipped, results, runId: run.id, summary: run.summary || null });
@@ -350,5 +409,5 @@ module.exports = {
   get REPORTS_DIR() { return P.reports; }, get RUNS_DIR() { return P.runs; },
   emit, broadcast, addSseClient, removeSseClient,
   listFlows, listFlowPaths, listReports, reportNameFor,
-  killTree, runSetup, runMaestro, runFlows, buildJobs
+  killTree, runSetup, runMaestro, runFlows, buildJobs, maestroOnPath
 };

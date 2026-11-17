@@ -43,11 +43,18 @@ module.exports = function register(r, ctx) {
     if (unsafe.length) return json(res, 400, { ok: false,
       error: "Rename these flows (use letters, numbers, spaces, - _ .): " + unsafe.map(i => i.flow).join(", ") });
     if (!items.length) return json(res, 400, { ok: false, error: "no valid flows" });
+    // Checks before the run. Without them a missing piece was recorded as a FAILED test a few
+    // milliseconds later, which also lowered the pass rate in Insights.
+    if (!runner.maestroOnPath())
+      return json(res, 400, { ok: false, code: "MAESTRO_NOT_FOUND",
+        error: "Maestro was not found on this PC, so nothing was run. Open Setup to install it, then restart Understudy." });
     let device = android.SERIAL_RE.test(String(parsed.device || "")) ? String(parsed.device) : null;
-    if (device) {                                          // only if it is really connected now
-      const list = await android.devices().catch(() => []);
-      if (!list.some(d => d.serial === device && d.state === "device")) device = null;
-    }
+    const list = await android.devices().catch(() => null);    // null: adb could not be asked, let Maestro decide
+    if (list && !list.some(d => d.state === "device"))
+      return json(res, 400, { ok: false, code: "DEVICE_OFFLINE",
+        error: "No phone or virtual device is connected, so nothing was run. Connect one on the Record tab." });
+    // the chosen device only if it is really connected now
+    if (device && !(list || []).some(d => d.serial === device && d.state === "device")) device = null;
     const jobs = runner.buildJobs(items, device);      // validates row selections
     const meta = { suite: parsed.suite ? String(parsed.suite).slice(0, 60) : null, device };
     if (state.busy) return json(res, 409, { ok: false, error: "busy" });

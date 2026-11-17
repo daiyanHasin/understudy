@@ -21,6 +21,8 @@ Naming: in each feature folder, `x.js` = logic on the PC, `x.routes.js` = its HT
 | `app/app.js` | Shared helpers: `$`, `el`, `toast`, `modal`, theme, tabs, the `hooks` list other screens register on |
 | `app/styles.css` | All styling; design tokens at the top (see `DESIGN-SYSTEM.md`) |
 | `src/core/secure-fetch.ui.js` | Adds the session token to every changing request; "server restarted" reload banner (loaded first) |
+| `src/core/motion.ui.js` | Numbers that count, the elastic pull at the end of a list, the Bench / Studio style switch (optional: nothing depends on it) |
+| `src/record/target.ui.js` | Record tab: the phone + app control in the top bar, and the search in "Add a step" |
 | `src/core/shell.ui.js` | Sidebar collapse, opening fade-in, first-run guide (loaded last) |
 | `src/run/run.ui.js` | Run tab: flow list, queue, start/stop, live steps, results (SSE) |
 | `src/run/run-extras.ui.js` | Run tab extras: tag quick-select, suites, data preview, "data used" panel |

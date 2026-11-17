@@ -12,6 +12,7 @@
 <body>
 <script>/* Restore the sidebar state before the first paint (no flicker) */
 try { if (localStorage.getItem("us.side") === "collapsed") document.documentElement.classList.add("side-collapsed"); } catch (e) {}
+try { if (localStorage.getItem("us.style") === "studio") document.documentElement.classList.add("style-studio"); } catch (e) {}
 try { if (!sessionStorage.getItem("us.splash")) document.documentElement.classList.add("splashing"); } catch (e) {}</script>
 <div id="splash" class="splash" aria-hidden="true">
   <div class="splash-mark"><img src="assets/logo.svg" alt="" width="84" height="84"><b>Understudy</b><span>Show it once. It performs a thousand times.</span></div>
@@ -29,7 +30,7 @@ try { if (!sessionStorage.getItem("us.splash")) document.documentElement.classLi
   </div>
   <div class="projbox">
     <button class="projbtn" id="projBtn" onclick="Projects.toggle()" aria-haspopup="true" title="Switch project">
-      <span class="pdot" aria-hidden="true"></span><span class="pinfo"><small>Project</small><b id="projName">&hellip;</b></span><span class="pchev" aria-hidden="true">&#9662;</span>
+      <span class="pdot" aria-hidden="true"></span><span class="pinfo"><small>Project</small><b id="projName">&hellip;</b></span><span class="pchev" aria-hidden="true"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></span>
     </button>
     <span class="projpath" id="projpath">&hellip;</span>
     <div class="projpop" id="projPop" hidden></div>
@@ -45,12 +46,11 @@ try { if (!sessionStorage.getItem("us.splash")) document.documentElement.classLi
     <button class="tab"        id="tabbtn-setup"  title="Setup" onclick="showTab('setup')"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg><span>Setup</span></button>
   </nav>
   <div class="sfoot">
-    <div class="user" title="Accounts are coming in a later version">
-      <span class="avatar" aria-hidden="true">LU</span>
-      <div class="uinfo"><b>Local user</b><span>Sign-in coming soon</span></div>
+    <div class="srow">
+      <button class="btn mini icon" id="themeBtn" onclick="toggleTheme()" title="Light or dark" aria-label="Light or dark"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/></svg></button>
+      <button class="btn mini stylebtn" id="styleBtn" onclick="Motion.toggleStyle()" title="Switch between the two looks: Bench and Studio"><span>Style</span><small id="styleName">Bench</small></button>
     </div>
     <div class="srow">
-      <button class="btn mini icon" id="themeBtn" onclick="toggleTheme()" title="Toggle dark mode" aria-label="Toggle dark mode">&#9788;</button>
       <button class="btn mini grow" onclick="quitApp()" title="Stop Understudy">Quit</button>
     </div>
   </div>
@@ -63,44 +63,54 @@ try { if (!sessionStorage.getItem("us.splash")) document.documentElement.classLi
 <section id="tab-record" class="flex flex-col h-full min-h-0" hidden>
   <div class="cmdbar pagebar" role="toolbar" aria-label="Recording setup">
     <div class="pb-title hidden 2xl:flex"><span class="kicker">Flow</span><h2>New flow</h2></div>
-    <div class="cgroup cdev">
-      <span class="ldot" id="recDot" aria-hidden="true"></span>
-      <select id="recDevice" onchange="Rec.chooseDevice()" aria-label="Device"></select>
-      <button class="btn" onclick="Connect.open()">Connect device</button>
-      <button class="btn icon quiet" onclick="Rec.refreshDevices()" title="Look for devices again" aria-label="Look for devices again">&#8635;</button>
-      <button class="btn quiet" id="recDisconnect" onclick="Rec.disconnect()" disabled>Disconnect</button>
-    </div>
-    <div class="cgroup capp">
-      <label class="clabel" for="recApp">App</label>
-      <div class="appfield">
-        <input type="text" id="recApp" list="recPkgs" placeholder="com.example.app" spellcheck="false" aria-label="App ID">
-        <details class="menu right" id="appMenu">
-          <summary class="btn icon quiet" title="Choose an app or install an APK" aria-label="Choose an app or install an APK">&#9662;</summary>
-          <div class="menupop apppop">
-            <div class="mgroup">
-              <b>Installed on the device</b>
-              <button class="btn" onclick="Rec.pickApp()">Choose from installed apps&hellip;</button>
-            </div>
-            <div class="mgroup">
-              <b>Install from an APK</b>
-              <span class="fhint">APKs stay in this project's Apps folder. Nothing is uploaded.</span>
-              <div class="row2">
-                <select id="recApk" aria-label="APK"></select>
-                <button class="btn icon" id="recApkDel" onclick="Rec.deleteApk()" title="Remove this APK from the list" aria-label="Remove this APK" disabled>&times;</button>
+    <details class="menu target" id="targetMenu">
+      <summary class="btn" title="The phone and the app you are recording. Click to change.">
+        <span class="ldot" id="tgDot" aria-hidden="true"></span><b id="tgDev">Phone</b><small id="tgConn"></small>
+        <span class="tsep" aria-hidden="true"></span><span class="tapp" id="tgApp">no app chosen</span><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg>
+      </summary>
+      <div class="menupop targetpop">
+        <div class="cgroup cdev">
+          <span class="tlabel">Phone</span>
+          <span class="ldot" id="recDot" aria-hidden="true"></span>
+          <select id="recDevice" onchange="Rec.chooseDevice()" aria-label="Device"></select>
+          <button class="btn" onclick="Connect.open()">Connect device</button>
+          <button class="btn icon quiet" onclick="Rec.refreshDevices()" title="Look for devices again" aria-label="Look for devices again"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4h-4"/></svg></button>
+          <button class="btn quiet" id="recDisconnect" onclick="Rec.disconnect()" disabled>Disconnect</button>
+        </div>
+        <div class="cgroup capp">
+          <label class="clabel" for="recApp">App</label>
+          <div class="appfield">
+            <input type="text" id="recApp" list="recPkgs" placeholder="com.example.app" spellcheck="false" aria-label="App ID">
+            <details class="menu right" id="appMenu">
+              <summary class="btn icon quiet" title="Choose an app or install an APK" aria-label="Choose an app or install an APK"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></summary>
+              <div class="menupop apppop">
+                <div class="mgroup">
+                  <b>Installed on the device</b>
+                  <button class="btn" onclick="Rec.pickApp()">Choose from installed apps&hellip;</button>
+                </div>
+                <div class="mgroup">
+                  <b>Install from an APK</b>
+                  <span class="fhint">APKs stay in this project's Apps folder. Nothing is uploaded.</span>
+                  <div class="row2">
+                    <select id="recApk" aria-label="APK"></select>
+                    <button class="btn icon" id="recApkDel" onclick="Rec.deleteApk()" title="Remove this APK from the list" aria-label="Remove this APK" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+                  </div>
+                  <div class="row2">
+                    <button class="btn" onclick="Rec.pickApk()">Add APK&hellip;</button>
+                    <button class="btn" id="recInstall" onclick="Rec.installApk()" disabled>Install on device</button>
+                  </div>
+                  <input type="file" id="recApkFile" accept=".apk" hidden>
+                </div>
               </div>
-              <div class="row2">
-                <button class="btn" onclick="Rec.pickApk()">Add APK&hellip;</button>
-                <button class="btn solid" id="recInstall" onclick="Rec.installApk()" disabled>Install on device</button>
-              </div>
-              <input type="file" id="recApkFile" accept=".apk" hidden>
-            </div>
+            </details>
           </div>
-        </details>
+          <datalist id="recPkgs"></datalist>
+          <label class="opt inline whitespace-nowrap" title="Clear the app's data before launching"><input type="checkbox" id="recClear" checked> Fresh data</label>
+          <button class="btn" onclick="Rec.launch()">Launch app</button>
+        </div>
       </div>
-      <datalist id="recPkgs"></datalist>
-      <label class="opt inline whitespace-nowrap" title="Clear the app's data before launching"><input type="checkbox" id="recClear" checked> Fresh data</label>
-      <button class="btn" onclick="Rec.launch()">Launch app</button>
-    </div>
+    </details>
+    <button class="btn solid" id="tgConnect" onclick="Connect.open()">Connect phone</button>
     <div class="cgroup csave">
       <button class="btn big" id="recSaveRun" onclick="Ui.openSave(true)" title="Save the flow, then run it once"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/></svg>Run now</button>
       <button class="btn solid big" id="recSave" onclick="Ui.openSave(false)">Save flow</button>
@@ -119,9 +129,14 @@ try { if (!sessionStorage.getItem("us.splash")) document.documentElement.classLi
         <div class="stagebar">
           <span class="live" id="recLive" role="status"><i></i><span id="recLiveText">Not connected</span></span>
           <span class="grow"></span>
-          <label class="sw" title="Outline the element under the mouse, with the selector Maestro will use"><input type="checkbox" id="recInspectOn" checked><span>Elements</span></label>
-          <label class="sw" title="Outline every element on the screen at once"><input type="checkbox" id="recAllOn"><span>Show all</span></label>
-          <label class="sw" id="recFollowBox" title="From phone: keep taps in other apps (browser, camera ...) and add an Open app step when the app changes"><input type="checkbox" id="recFollow"><span>Other apps</span></label>
+          <details class="menu right viewmenu" id="viewMenu">
+            <summary class="btn mini">View<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></summary>
+            <div class="menupop viewpop">
+              <label class="sw" title="Outline the element under the mouse, with the selector Maestro will use"><input type="checkbox" id="recInspectOn" checked><span>Outline element under the mouse</span></label>
+              <label class="sw" title="Outline every element on the screen at once"><input type="checkbox" id="recAllOn"><span>Outline every element</span></label>
+              <label class="sw" id="recFollowBox" title="From phone: keep taps in other apps (browser, camera ...) and add an Open app step when the app changes"><input type="checkbox" id="recFollow"><span>Follow other apps</span></label>
+            </div>
+          </details>
         </div>
         <div class="phone">
           <canvas id="recScreen" aria-label="Device screen"></canvas>
@@ -173,7 +188,7 @@ try { if (!sessionStorage.getItem("us.splash")) document.documentElement.classLi
         <button class="ptab" id="ptab-el" role="tab" onclick="Rec.panel('el')">Inspect</button>
         <button class="ptab" id="ptab-ai" role="tab" onclick="Rec.panel('ai')">AI</button>
         <span class="grow"></span>
-        <button class="btn solid" id="recApply" onclick="Rec.applyYaml()" hidden>Apply changes</button>
+        <button class="btn" id="recApply" onclick="Rec.applyYaml()" hidden>Apply changes</button>
       </div>
 
       <div class="pane" id="pane-steps">
@@ -196,8 +211,10 @@ try { if (!sessionStorage.getItem("us.splash")) document.documentElement.classLi
         </div>
         <div class="ptools pfoot">
           <details class="menu up" id="insMenu">
-            <summary class="btn dashed">+ Add a step</summary>
-            <div class="menupop narrow insmenu">
+            <summary class="btn dashed"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add a step</summary>
+            <div class="menupop insmenu" role="listbox" aria-label="Add a step">
+              <label class="insfind"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M16 16l4 4"/></svg><input type="search" id="insFind" placeholder="Find a step&hellip;" autocomplete="off" spellcheck="false" aria-label="Find a step"></label>
+              <div class="inslist" id="insList">
               <span class="mhead">Basics</span>
               <button onclick="Rec.insert('wait')">Wait for animations</button>
               <button onclick="Rec.insert('waitUntil')">Wait until something shows&hellip;</button>
@@ -233,6 +250,8 @@ try { if (!sessionStorage.getItem("us.splash")) document.documentElement.classLi
               <button onclick="Rec.insert('ifExpr')">If variable / condition &hellip; else &hellip;</button>
               <button onclick="Rec.insert('while')">Repeat while visible</button>
               <button onclick="Rec.insert('retry')">Retry block</button>
+              </div>
+              <div class="insfoot" id="insFoot"></div>
             </div>
           </details>
           <span class="grow"></span>
@@ -294,7 +313,7 @@ try { if (!sessionStorage.getItem("us.splash")) document.documentElement.classLi
   <div class="dialog connectdlg" role="dialog" aria-modal="true" aria-labelledby="connectTitle">
     <div class="cd-head">
       <div><h3 id="connectTitle">Connect a device</h3><p class="dtext">A phone by USB or Wi-Fi is the fastest option. No Android Studio needed.</p></div>
-      <button class="btn icon quiet" onclick="Connect.close()" aria-label="Close">&times;</button>
+      <button class="btn icon quiet" onclick="Connect.close()" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </div>
     <div class="cd-tools" id="cdTools" hidden>
       <div class="cd-toolcard">
@@ -356,7 +375,7 @@ try { if (!sessionStorage.getItem("us.splash")) document.documentElement.classLi
           <label class="field"><span class="flabel">Connection IP:port (the top of Wireless debugging; not the pairing port)</span>
             <input type="text" id="recAddr" placeholder="192.168.0.12:37123" spellcheck="false"></label>
           <div class="row2">
-            <button class="btn solid" onclick="Rec.connectWifi()">Connect</button>
+            <button class="btn" onclick="Rec.connectWifi()">Connect</button>
             <button class="btn" onclick="Connect.checkWifi()" title="Tests whether this PC can reach the phone and says why not">Check connection</button>
           </div>
           <div class="cd-watch" id="cdWifiMsg" hidden><i></i><span></span></div>
@@ -415,7 +434,7 @@ try { if (!sessionStorage.getItem("us.splash")) document.documentElement.classLi
     <div class="px-6 pt-6 pb-4 flex flex-col gap-3">
       <div class="flex items-start gap-3">
         <div class="flex-1"><h3 id="flowPickTitle">Add flows to the queue</h3><p class="dtext !mb-0">They run in the order you tick them. Reorder them in the queue afterwards.</p></div>
-        <button class="btn icon quiet" onclick="Ui.closeFlows()" aria-label="Close">&times;</button>
+        <button class="btn icon quiet" onclick="Ui.closeFlows()" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
       </div>
       <div class="flex gap-2">
         <input type="text" id="filter" class="flex-1 min-w-0 !h-10" placeholder="Find a flow&hellip;" oninput="renderFlows()" aria-label="Find a flow">
@@ -443,7 +462,7 @@ try { if (!sessionStorage.getItem("us.splash")) document.documentElement.classLi
       <button id="prepBtn" class="btn mini" onclick="prepareData()">Prepare data</button>
     </div>
     <details class="menu">
-      <summary class="btn quiet">Folders &#9662;</summary>
+      <summary class="btn quiet">Folders<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></summary>
       <div class="menupop narrow">
         <button onclick="openFolder('reports')">Open Reports</button>
         <button onclick="openFolder('testdata')">Open TestData</button>
@@ -458,7 +477,7 @@ try { if (!sessionStorage.getItem("us.splash")) document.documentElement.classLi
     <button id="runBtn"    class="btn solid big" onclick="runSelected()" title="Run the flows in the queue"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/></svg>Run queue</button>
   </header>
 
-  <div class="flex-1 min-h-0 grid gap-4 p-5 grid-cols-1 lg:grid-cols-[minmax(290px,340px)_minmax(0,1fr)] xl:grid-cols-[minmax(300px,350px)_minmax(0,1fr)_minmax(270px,330px)]">
+  <div id="runGrid" class="flex-1 min-h-0 grid gap-4 p-5 grid-cols-1 lg:grid-cols-[minmax(290px,340px)_minmax(0,1fr)] xl:grid-cols-[minmax(300px,350px)_minmax(0,1fr)_minmax(270px,330px)]">
     <!-- Queue -->
     <div class="panel">
       <div class="panel-h"><h3>Queue</h3><span class="grow"></span>
@@ -475,7 +494,7 @@ try { if (!sessionStorage.getItem("us.splash")) document.documentElement.classLi
         <div class="hint !mt-0">Rows: leave empty for row 1, or type <code>all</code>, <code>2,7,13</code>, <code>2-5</code>. Each row runs as its own test with its own report.</div>
       </div>
       <div class="panel-f">
-        <button class="btn dashed" onclick="Ui.openFlows()">+ Add flows</button>
+        <button class="btn dashed" onclick="Ui.openFlows()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add flows</button>
         <span class="grow"></span>
         <button class="btn quiet" onclick="suiteSave()">Save as suite</button>
       </div>
@@ -516,7 +535,7 @@ try { if (!sessionStorage.getItem("us.splash")) document.documentElement.classLi
     </div>
 
     <!-- Data row + results -->
-    <div class="flex flex-col gap-4 min-h-0 lg:col-span-2 xl:col-span-1 lg:grid lg:grid-cols-2 xl:flex">
+    <div id="runSide" class="flex flex-col gap-4 min-h-0 lg:col-span-2 xl:col-span-1 lg:grid lg:grid-cols-2 xl:flex">
       <div class="panel xl:max-h-[45%]">
         <div class="panel-h"><h3>Data row</h3></div>
         <div class="panel-b datapanel" id="liveData"><div class="empty">The Excel row used by the running flow shows here.</div></div>
@@ -588,7 +607,7 @@ try { if (!sessionStorage.getItem("us.splash")) document.documentElement.classLi
       <div class="panel-h gap-2 !px-3">
         <input type="text" id="edFilter" class="flex-1 min-w-0" placeholder="Find a flow&hellip;" oninput="renderFlowEditorList()" aria-label="Find a flow">
         <button class="btn icon" onclick="newFlowDialog()" title="New flow" aria-label="New flow">+</button>
-        <button class="btn icon quiet" onclick="loadFlows()" title="Read the Flows folder again" aria-label="Refresh">&#8635;</button>
+        <button class="btn icon quiet" onclick="loadFlows()" title="Read the Flows folder again" aria-label="Refresh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4h-4"/></svg></button>
       </div>
       <div class="panel-b"><div class="flowlist" id="edList">Loading&hellip;</div></div>
     </div>
@@ -625,27 +644,27 @@ try { if (!sessionStorage.getItem("us.splash")) document.documentElement.classLi
       </div>
 
       <div class="flex flex-col gap-4">
-        <div class="panel">
-          <div class="panel-h"><h3>Phones</h3><span class="dim text-xs">No Android Studio needed</span></div>
+        <details class="panel fold">
+          <summary class="panel-h"><h3>Phones</h3><span class="dim text-xs">No Android Studio needed</span><span class="grow"></span><svg class="ico cchev" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></summary>
           <p class="prose px-5 py-4">A USB or Wi-Fi phone only needs Google's platform-tools (adb). Understudy downloads it into its own folder when you press <b>Install phone tools</b> (about 8 MB, no admin rights, nothing else changed). Wi-Fi phones pair by scanning a QR code.</p>
-        </div>
-        <div class="panel">
-          <div class="panel-h"><h3>Virtual devices</h3><span class="dim text-xs">Optional</span><span class="grow"></span>
-            <button class="btn mini" onclick="installAndroid()">Install virtual-device tools&hellip;</button></div>
+        </details>
+        <details class="panel fold">
+          <summary class="panel-h"><h3>Virtual devices</h3><span class="dim text-xs">Optional</span><span class="grow"></span>
+            <button class="btn mini" onclick="installAndroid()">Install virtual-device tools&hellip;</button><svg class="ico cchev" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></summary>
           <p class="prose px-5 py-4">Only if you want to test without a phone. Installs the emulator and one light system image from Google's official server, then creates Understudy_Pixel (2 GB RAM). About 1.5 GB to download. A window shows the progress.</p>
-        </div>
-        <div class="panel">
-          <div class="panel-h"><h3>AI helper</h3><span class="dim text-xs">Optional</span></div>
+        </details>
+        <details class="panel fold" open>
+          <summary class="panel-h"><h3>AI helper</h3><span class="dim text-xs">Optional</span><span class="grow"></span><svg class="ico cchev" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></summary>
           <div class="px-5 py-4" id="aiSetup"><div class="empty">Checking&hellip;</div></div>
-        </div>
-        <div class="panel">
-          <div class="panel-h"><h3>Free memory</h3><span class="grow"></span><button class="btn mini" onclick="Rec.freeMemory()">Show Android programs&hellip;</button></div>
+        </details>
+        <details class="panel fold">
+          <summary class="panel-h"><h3>Free memory</h3><span class="grow"></span><button class="btn mini" onclick="Rec.freeMemory()">Show Android programs&hellip;</button><svg class="ico cchev" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></summary>
           <p class="prose px-5 py-4">After you close a virtual device, the emulator, adb and Android Studio can keep gigabytes of memory. Understudy ends the emulator itself when you press Stop; use this to end everything Android-related at once.</p>
-        </div>
-        <div class="panel">
-          <div class="panel-h"><h3>Typing non-English text</h3></div>
+        </details>
+        <details class="panel fold">
+          <summary class="panel-h"><h3>Typing non-English text</h3><span class="grow"></span><svg class="ico cchev" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></summary>
           <p class="prose px-5 py-4">With the live screen, Bengali and any other script is typed through the device clipboard, nothing to install. Without it, install the free, open-source ADB Keyboard app on the device once (add its APK on the Record tab and press Install).</p>
-        </div>
+        </details>
         <div class="panel">
           <div class="panel-h"><h3>Folders</h3></div>
           <div class="flex flex-wrap gap-2 px-5 py-4">
@@ -697,7 +716,7 @@ try { if (!sessionStorage.getItem("us.splash")) document.documentElement.classLi
     </div>
     <span class="text-[13px] text-dim hidden 2xl:inline">From your run history in <code>History/</code></span>
     <span class="grow"></span>
-    <button class="btn solid big" onclick="Ui.openCompare()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v16M15 4v16M5 8l4-4 4 4M11 16l4 4 4-4"/></svg>Compare two runs</button>
+    <button class="btn big" onclick="Ui.openCompare()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v16M15 4v16M5 8l4-4 4 4M11 16l4 4 4-4"/></svg>Compare two runs</button>
   </header>
 
   <div class="flex-1 min-h-0 overflow-auto p-5">
@@ -735,7 +754,7 @@ try { if (!sessionStorage.getItem("us.splash")) document.documentElement.classLi
     <div class="px-6 pt-6 pb-2">
       <div class="flex items-start gap-3">
         <div class="flex-1"><h3 id="compareTitle">Compare two runs</h3><p class="dtext !mb-0">See what got fixed and what broke between them.</p></div>
-        <button class="btn icon quiet" onclick="Ui.closeCompare()" aria-label="Close">&times;</button>
+        <button class="btn icon quiet" onclick="Ui.closeCompare()" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
       </div>
       <div class="grid gap-3 sm:grid-cols-2 mt-4">
         <label class="block"><span class="flabel">Before</span><select id="cmpA" class="w-full !h-10" onchange="renderCompare()"></select></label>
@@ -830,7 +849,9 @@ document.addEventListener("input", function (e) { if (e.target && e.target.id ==
 <script src="src/setup/setup.ui.js"></script>
 <script src="src/device/connect.ui.js"></script>
 <script src="src/record/recorder.ui.js"></script>
+<script src="src/record/target.ui.js"></script>
 <script src="src/projects/projects.ui.js"></script>
 <script src="src/ai/ai.ui.js"></script>
+<script src="src/core/motion.ui.js"></script>
 <script src="src/core/shell.ui.js"></script>
 </body></html>

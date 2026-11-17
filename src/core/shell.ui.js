@@ -54,7 +54,7 @@ var Shell = (function () {
     document.body.appendChild(ov);
     requestAnimationFrame(function () { ov.classList.add("show"); });
   }
-  setTimeout(welcome, 1900);
+  // Not opened automatically since 2.3: the empty Record screen is the guide. Shell.welcome(true) still shows it.
 
   return { toggleSide: toggleSide, welcome: welcome };
 })();

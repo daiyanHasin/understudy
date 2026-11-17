@@ -242,12 +242,14 @@ var Reports = (function () {
 
   /* ---------- Report picks from the Run tab open here ---------- */
   function openByReport(name) {
-    var url = "/reports/" + encodeURIComponent(name);
+    var url = "/reports/" + encodeURIComponent(name), tail = "/" + encodeURIComponent(name);
     var hit = null;
     return api("/api/history").then(function (list) {
       for (var i = list.length - 1; i >= 0 && !hit; i--) {
         var r = list[i];
-        if (r.summary === name || (r.jobs || []).some(function (j) { return j.report === url; })) hit = r;
+        // j.report is the run's own copy since 2.2.5: /reports/_runs/<run>/<name>
+        if (r.summary === name || (r.jobs || []).some(function (j) {
+              return j.report === url || (j.report && j.report.slice(-(tail.length)) === tail); })) hit = r;
       }
       if (!hit) return false;
       showTab("reports"); load(hit.id);

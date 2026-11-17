@@ -38,13 +38,32 @@ function backupFlow(full) {
   const rel = path.relative(P.flows, full).replace(/[\\/]/g, "__");
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   fs.copyFileSync(full, path.join(P.flowBackups, rel + "." + stamp + ".bak"));
+  pruneBackups(P.flowBackups, rel + ".", ".bak");
+}
+
+const KEEP_BACKUPS = 20;
+/** Keep the newest KEEP_BACKUPS backups of one flow (the folder grew without limit before 2.2.5). */
+function pruneBackups(dir, prefix, suffix) {
+  try {
+    const mine = fs.readdirSync(dir)
+      .filter(f => f.startsWith(prefix) && f.endsWith(suffix) &&
+                   /^\d{4}-\d{2}-\d{2}T[\d-]+Z$/.test(f.slice(prefix.length, f.length - suffix.length)))
+      .sort();
+    mine.slice(0, Math.max(0, mine.length - KEEP_BACKUPS)).forEach(f => { try { fs.unlinkSync(path.join(dir, f)); } catch (_) {} });
+  } catch (_) {}
 }
 
 function saveFlow(rel, content) {
   if (typeof content !== "string") throw new Error("Content must be a string");
   const full = resolveFlowForWrite(rel);
   if (fs.existsSync(full)) backupFlow(full);
-  else fs.mkdirSync(path.dirname(full), { recursive: true });
+  else {
+    // A new flow gets the same name rule as Rename, Duplicate and Run. Before 2.2.5 a flow
+    // could be created with a name ("login & test.yaml", non-English letters) that Run then refused.
+    // Flows that already exist under such a name can still be opened and saved, then renamed.
+    sanitizeName(path.relative(P.flows, full).split(path.sep).join("/"));
+    fs.mkdirSync(path.dirname(full), { recursive: true });
+  }
   fs.writeFileSync(full, content, "utf8");
   return true;
 }
@@ -53,8 +72,8 @@ function saveFlow(rel, content) {
 function sanitizeName(name) {
   const n = String(name || "").trim();
   if (!n) throw new Error("Name is required");
-  if (!/^[A-Za-z0-9._\-/ ]+$/.test(n))
-    throw new Error("Name can only contain letters, numbers, space, . _ - /");
+  if (!/^[A-Za-z0-9._\-/ ]{1,200}$/.test(n))
+    throw new Error("Flow names can only use English letters, numbers, spaces, . _ - and / for folders");
   if (n.includes("..")) throw new Error("Name cannot contain ..");
   return n;
 }
